@@ -15,7 +15,7 @@ GitHub: https://github.com/onachoson2-tech/timetable-program
 ## 현재 상태
 
 - 기본 구동 완료
-- data.csv 실데이터 입력 완료 (총 391개 행)
+- data.csv 실데이터 입력 완료 (총 379개 행)
 - data.csv 기준 코드 전면 재작성 완료
 - filters.py 신규 생성 완료 (조건 필터링 분리)
 - 탐색 속도 최적화 완료
@@ -257,6 +257,10 @@ timetable_optimizer_fixed_1/
 | `canvas_view.py` — 시간표 블록 내 교수명·강의실 표시 추가 | ✅ 완료 |
 | `canvas_view.py` — 시간표 블록 폰트 크기 확대 | ✅ 완료 |
 | `main.py` — 학점 초과 경고 메시지 추가 | ✅ 완료 |
+| `data.csv` — VERUM인성:그리스도교문화 2분반 수강 자격 수정 (AI소프트웨어융합학부 26학번 수강 가능) | ✅ 완료 |
+| `data_loader.py`, `filters.py` — VERUM인성:그리스도교문화 _REMARK_EXCEPTIONS 제거 | ✅ 완료 |
+| `data.csv` — 창의성 영역 중복 12행 제거 (24행 → 12행) | ✅ 완료 |
+| `data_loader.py`, `filters.py` — _INVALID_REMARKS에 외국인유학생전용강좌 키워드 추가 | ✅ 완료 |
 
 ---
 
