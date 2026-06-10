@@ -16,7 +16,9 @@ GitHub: https://github.com/onachoson2-tech/timetable-program
 
 - 기본 구동 완료
 - data.csv 실데이터 입력 완료 (총 391개 행)
-- data.csv 기준 코드 전면 재작성 진행 중
+- data.csv 기준 코드 전면 재작성 완료
+- filters.py 신규 생성 완료 (조건 필터링 분리)
+- 탐색 속도 최적화 완료
 
 ---
 
@@ -176,11 +178,12 @@ GitHub: https://github.com/onachoson2-tech/timetable-program
 ## 파일 구조
 
 ```
-timetable_optimizer/
+timetable_optimizer_fixed_1/
 ├── main.py          # 앱 진입점 및 이벤트 연결
 ├── ui_panel.py      # 왼쪽 설정 패널 UI
 ├── canvas_view.py   # 시간표 캔버스 그리기
 ├── algorithm.py     # 충돌 검사 및 시간표 탐색
+├── filters.py       # 시간표 조건 필터링 (오전회피·금공강·점심확보)
 ├── data_loader.py   # 데이터 로딩 및 시간 처리
 ├── config.py        # 상수 및 규칙 정의
 └── data.csv         # 강의 데이터
@@ -233,9 +236,23 @@ timetable_optimizer/
 
 ---
 
+## 코드 작업 진행 현황
+
+| 항목 | 상태 |
+|------|------|
+| `config.py` — data.csv 과목명 기준으로 전면 재작성 | ✅ 완료 |
+| `filters.py` — 조건 필터링 신규 분리 (오전회피·금공강·점심확보) | ✅ 완료 |
+| `ui_panel.py` — 교양필수 영역 체크박스 4개로 단순화 | ✅ 완료 |
+| `data_loader.py` — 분반 그룹화 키 교수명+분반번호 기준으로 수정 | ✅ 완료 |
+| `algorithm.py` — 교양필수 영역 자동 배정 구현 | ✅ 완료 |
+| `algorithm.py` — 조건 필터링 적용 | ✅ 완료 |
+| `algorithm.py` — 균형형·공강형·몰아듣기형 결과 정렬 구현 | ✅ 완료 |
+| `algorithm.py` — 탐색 속도 최적화 (사전 필터링·충돌 분리·max_r 동적 계산) | ✅ 완료 |
+| `canvas_view.py` — 교수명_분반번호 기준 행 조회 방식 수정 | ✅ 완료 |
+
+---
+
 ## 다음 세션 작업 예정
 
-1. `config.py` — data.csv 실제 과목명과 일치하도록 과목 목록 수정
-2. `data_loader.py` — 분반 그룹화 로직 수정 (교수명+분반번호 기준)
-3. `algorithm.py` — 조건 필터링 구현 (오전회피, 금공강, 점심확보)
-4. `algorithm.py` — 시간표 결과 정렬 개선 (균형형/공강형/몰아듣기형)
+1. 실행 테스트 — 전체 기능 동작 확인 및 버그 수정
+2. `data.csv` — 기타 학과 전공 과목 입력
