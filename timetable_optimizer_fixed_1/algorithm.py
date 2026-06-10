@@ -3,8 +3,11 @@
 # ────────────────────────────────
 
 from itertools import combinations
-from data_loader import load_data, time_to_min, get_subject_branches, get_courses_by_category
-from config import MAX_CREDITS, MAX_CREDITS_HONOR
+from data_loader import (load_data, time_to_min,
+                         get_subject_branches, get_courses_by_category,
+                         get_courses_by_domain)
+from config import MAX_CREDITS, MAX_CREDITS_HONOR, LIBERAL_AREA_DOMAINS
+from filters import passes_filters
 
 
 # ── 충돌 검사 ──────────────────────────────────────────
@@ -32,18 +35,23 @@ def has_any_conflict(rows: list) -> bool:
 
 # ── 분반 선택 ──────────────────────────────────────────
 
-def pick_best_branch(df, name: str, existing: list, prefs: dict) -> list | None:
+def pick_best_branch(df, name: str, existing: list, prefs: dict) -> tuple | None:
     """
-    과목의 여러 분반 중 기존 수업과 충돌 없는 첫 번째 분반을 반환.
-    모두 충돌이면 None 반환.
+    과목의 여러 분반 중 기존 수업과 충돌 없고 조건 필터를 통과하는
+    첫 번째 분반을 반환.
+    반환: (branch_key, rows) 또는 None
+    branch_key: "교수명_분반번호" 형태의 문자열
     """
     branches = get_subject_branches(df, name)
     if not branches:
         return None
 
-    for prof, rows in branches.items():
-        if not has_any_conflict(existing + rows):
-            return rows
+    for key, rows in branches.items():
+        if has_any_conflict(existing + rows):
+            continue
+        if not passes_filters(rows, prefs):
+            continue
+        return key, rows
 
     return None
 
@@ -52,10 +60,15 @@ def pick_best_branch(df, name: str, existing: list, prefs: dict) -> list | None:
 
 def calc_timetable_stats(rows: list) -> tuple:
     """
-    시간표의 공강 일수, 총 학점 반환.
-    반환: (free_days, total_credits)
+    시간표의 공강 일수, 수업 있는 요일 수, 요일별 수업 수 편차, 총 학점 반환.
+    반환: (free_days, active_days, day_variance, total_credits)
+      free_days     : 공강 일수 (월~금 기준)
+      active_days   : 수업 있는 요일 수
+      day_variance  : 요일별 수업 블록 수 편차 (균형형 정렬에 사용)
+      total_credits : 총 학점
     """
     days, seen = set(), set()
+    day_counts: dict = {"월": 0, "화": 0, "수": 0, "목": 0, "금": 0}
     total_cr = 0.0
 
     for r in rows:
@@ -66,11 +79,17 @@ def calc_timetable_stats(rows: list) -> tuple:
             total_cr += float(r.get("학점", 0))
             seen.add(nm)
 
-        if day and day != "nan":
+        if day in day_counts:
             days.add(day)
+            day_counts[day] += 1
 
-    free = len({"월", "화", "수", "목", "금"} - days)
-    return free, round(total_cr, 1)
+    free        = len({"월", "화", "수", "목", "금"} - days)
+    active      = len(days)
+    counts      = list(day_counts.values())
+    avg         = sum(counts) / 5
+    variance    = sum((c - avg) ** 2 for c in counts) / 5
+
+    return free, active, round(variance, 4), round(total_cr, 1)
 
 
 def _sum_credits(rows: list, names: set) -> float:
@@ -88,25 +107,41 @@ def _sum_credits(rows: list, names: set) -> float:
 
 def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
     """
-    preferences 에 따라 유효한 시간표 3개를 탐색해 반환.
+    preferences 에 따라 유효한 시간표를 탐색해 균형형·공강형·몰아듣기형
+    각 1개씩 최대 3개를 반환.
+
     반환: [(subject_profs, free_days, total_credits), ...]
-      subject_profs: [(과목명, 교수), ...] — 알고리즘이 선택한 분반 정보 포함
+      subject_profs: [(과목명, 교수명_분반번호), ...]
     """
-    df = load_data()
+    df     = load_data()
     max_cr = MAX_CREDITS_HONOR if honor_student else MAX_CREDITS
     prefs  = preferences
 
     fixed_rows: list  = []
     fixed_names: set  = set()
-    fixed_profs: dict = {}   # {과목명: 교수} — 알고리즘이 선택한 분반 기록
+    fixed_profs: dict = {}   # {과목명: "교수명_분반번호"}
 
     # 1. 선택한 전공 과목 추가
     for nm in preferences.get("selected_major", []):
         _add_subject(df, nm, fixed_rows, fixed_names, fixed_profs, prefs)
 
-    # 2. 선택한 교양필수 추가
-    for nm in preferences.get("selected_liberal", []):
-        _add_subject(df, nm, fixed_rows, fixed_names, fixed_profs, prefs)
+    # 2. 선택한 교양필수 영역에서 과목 자동 배정
+    for area in preferences.get("selected_liberal", []):
+        domain = LIBERAL_AREA_DOMAINS.get(area)
+        if not domain:
+            continue
+        domain_df = get_courses_by_domain(df, domain)
+        for _, row in domain_df.iterrows():
+            nm = row["과목명"]
+            if nm in fixed_names:
+                continue
+            result = pick_best_branch(df, nm, fixed_rows, prefs)
+            if result:
+                key, branch = result
+                fixed_rows.extend(branch)
+                fixed_names.add(nm)
+                fixed_profs[nm] = key
+                break   # 영역당 1과목만 배정
 
     # 3. 남은 학점 계산
     fixed_cr  = _sum_credits(fixed_rows, fixed_names)
@@ -118,7 +153,6 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
     opt_list = opt_df.to_dict("records")
 
     # 5. 조합 탐색
-    # r(교양선택 과목 수)별로 최대 PER_R개씩 수집해 다양한 크기의 조합을 골고루 탐색한다.
     PER_R   = 200
     MAX_ALL = 1400
 
@@ -131,17 +165,26 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
                 continue
 
             all_rows = fixed_rows + list(combo)
+
             if has_any_conflict(all_rows):
                 continue
+            if not passes_filters(all_rows, prefs):
+                continue
 
-            free, total = calc_timetable_stats(all_rows)
+            free, active, variance, total = calc_timetable_stats(all_rows)
 
-            combo_profs = {c["과목명"]: str(c["교수"]) for c in combo}
+            # 교양선택 과목의 교수명_분반번호 기록
+            combo_profs = {}
+            for c in combo:
+                nm  = c["과목명"]
+                key = f"{c['교수']}_{c['분반']}"
+                combo_profs[nm] = key
+
             subject_profs = (
                 [(nm, fixed_profs[nm]) for nm in fixed_names]
                 + [(nm, combo_profs[nm]) for nm in combo_profs]
             )
-            results.append((subject_profs, free, total))
+            results.append((subject_profs, free, active, variance, total))
             count_r += 1
 
             if count_r >= PER_R:
@@ -150,7 +193,7 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
         if len(results) >= MAX_ALL:
             break
 
-    return results[:3]
+    return _pick_three(results)
 
 
 def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
@@ -158,11 +201,52 @@ def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
     """과목을 fixed 목록에 추가. 이미 있거나 분반 없으면 무시."""
     if name in fixed_names:
         return
-    branch = pick_best_branch(df, name, fixed_rows, prefs)
-    if branch:
+    result = pick_best_branch(df, name, fixed_rows, prefs)
+    if result:
+        key, branch = result
         fixed_rows.extend(branch)
         fixed_names.add(name)
-        fixed_profs[name] = str(branch[0].get("교수", ""))
+        fixed_profs[name] = key
+
+
+# ── 결과 정렬 및 3개 선택 ─────────────────────────────
+
+def _pick_three(results: list) -> list:
+    """
+    탐색된 결과에서 균형형·공강형·몰아듣기형 각 1개를 선택해 반환.
+
+    results 원소: (subject_profs, free_days, active_days, day_variance, total_credits)
+
+    균형형      : 요일별 수업 수 편차(day_variance) 최소
+    공강형      : 공강 일수(free_days) 최대
+    몰아듣기형  : 수업 있는 요일 수(active_days) 최소
+    """
+    if not results:
+        return []
+
+    # 균형형: day_variance 오름차순
+    balanced    = sorted(results, key=lambda x: x[3])[0]
+
+    # 공강형: free_days 내림차순
+    free_day    = sorted(results, key=lambda x: -x[1])[0]
+
+    # 몰아듣기형: active_days 오름차순
+    packed      = sorted(results, key=lambda x: x[2])[0]
+
+    # 내부 통계 필드(active_days, day_variance) 제거 후 반환
+    # 반환 형태: [(subject_profs, free_days, total_credits), ...]
+    def trim(r):
+        return (r[0], r[1], r[4])
+
+    # 중복 제거: 같은 결과가 여러 유형에 선택될 수 있음
+    seen, trimmed = set(), []
+    for r in [balanced, free_day, packed]:
+        key = tuple(sorted(nm for nm, _ in r[0]))
+        if key not in seen:
+            seen.add(key)
+            trimmed.append(trim(r))
+
+    return trimmed
 
 
 # ── 추천 이유 텍스트 ──────────────────────────────────
@@ -170,7 +254,7 @@ def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
 def get_reason(subject_profs: list, free_days: int,
                total_credits: float, prefs: dict) -> str:
     """
-    subject_profs: [(과목명, 교수), ...]
+    subject_profs: [(과목명, 교수명_분반번호), ...]
     """
     parts = []
     if free_days >= 1:
