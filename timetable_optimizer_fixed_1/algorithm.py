@@ -6,7 +6,8 @@ from itertools import combinations
 from data_loader import (load_data, time_to_min,
                          get_subject_branches, get_courses_by_category,
                          get_courses_by_domain)
-from config import MAX_CREDITS, MAX_CREDITS_HONOR, LIBERAL_AREA_DOMAINS
+from config import (MAX_CREDITS, MAX_CREDITS_HONOR,
+                    LIBERAL_AREA_DOMAINS, LIBERAL_AREA_COUNT)
 from filters import passes_filters
 
 
@@ -173,12 +174,18 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
         _add_subject(df, nm, fixed_rows, fixed_names, fixed_profs, prefs)
 
     # 2. 선택한 교양필수 영역에서 과목 자동 배정
+    #    LIBERAL_AREA_COUNT 기준으로 영역당 지정된 수만큼 배정
     for area in preferences.get("selected_liberal", []):
         domain = LIBERAL_AREA_DOMAINS.get(area)
         if not domain:
             continue
+        count     = LIBERAL_AREA_COUNT.get(area, 1)  # 배정할 과목 수
+        assigned  = 0
         domain_df = get_courses_by_domain(df, domain)
+
         for _, row in domain_df.iterrows():
+            if assigned >= count:
+                break
             nm = row["과목명"]
             if nm in fixed_names:
                 continue
@@ -188,14 +195,13 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
                 fixed_rows.extend(branch)
                 fixed_names.add(nm)
                 fixed_profs[nm] = key
-                break
+                assigned += 1
 
     # 3. 남은 학점 계산
     fixed_cr  = _sum_credits(fixed_rows, fixed_names)
     remaining = max_cr - fixed_cr
 
     # 4. 교양선택 후보 사전 정리
-    #    조건 위반·fixed 충돌 과목을 미리 제거해 조합 수를 줄인다
     candidates = _build_opt_candidates(df, fixed_rows, fixed_names, prefs)
 
     # 5. 남은 학점으로 가능한 최대 r 동적 계산
@@ -206,7 +212,6 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
         max_r = 0
 
     # 6. 조합 탐색
-    #    후보 간 충돌 검사만 수행 (fixed와의 충돌은 사전에 제거됨)
     PER_R   = 200
     MAX_ALL = 1400
 
@@ -259,8 +264,6 @@ def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
 def _pick_three(results: list) -> list:
     """
     탐색된 결과에서 균형형·공강형·몰아듣기형 각 1개를 선택해 반환.
-
-    results 원소: (subject_profs, free_days, active_days, day_variance, total_credits)
 
     균형형      : 요일별 수업 수 편차(day_variance) 최소
     공강형      : 공강 일수(free_days) 최대
