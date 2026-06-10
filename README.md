@@ -15,8 +15,8 @@ GitHub: https://github.com/onachoson2-tech/timetable-program
 ## 현재 상태
 
 - 기본 구동 완료
-- 버그 수정 및 코드 개선 진행 중
 - data.csv 실데이터 입력 완료 (총 391개 행)
+- data.csv 기준 코드 전면 재작성 진행 중
 
 ---
 
@@ -235,6 +235,7 @@ timetable_optimizer/
 
 ## 다음 세션 작업 예정
 
-1. data_loader.py 분반 그룹화 로직 수정 (교수명+분반번호 기준)
-3. algorithm.py 조건 필터링 구현 (오전회피, 금공강, 점심확보)
-4. 시간표 결과 정렬 개선 (균형형/공강형/몰아듣기형)
+1. `config.py` — data.csv 실제 과목명과 일치하도록 과목 목록 수정
+2. `data_loader.py` — 분반 그룹화 로직 수정 (교수명+분반번호 기준)
+3. `algorithm.py` — 조건 필터링 구현 (오전회피, 금공강, 점심확보)
+4. `algorithm.py` — 시간표 결과 정렬 개선 (균형형/공강형/몰아듣기형)
