@@ -4,7 +4,7 @@
 
 import customtkinter as ctk
 from config import (SW_COURSES, HC_COURSES, COMMON_COURSES,
-                    LIBERAL_COMMUNITY, LIBERAL_COMMUNICATION, TRACK_HINTS)
+                    LIBERAL_AREAS, TRACK_HINTS)
 
 
 class SettingsPanel(ctk.CTkScrollableFrame):
@@ -47,7 +47,7 @@ class SettingsPanel(ctk.CTkScrollableFrame):
 
     # ── 내부 빌드 ──────────────────────────────────────
 
-    def _section(self, title: str, subtitle: str = "다수 선택 가능"):
+    def _section(self, title: str, subtitle: str = ""):
         f = ctk.CTkFrame(self)
         f.pack(pady=4, padx=10, fill="x")
         ctk.CTkLabel(f, text=title,
@@ -79,24 +79,24 @@ class SettingsPanel(ctk.CTkScrollableFrame):
     def _build_year(self):
         f = self._section("📚 학년 선택")
         self._year_var = ctk.StringVar(value="1학년")
-        ctk.CTkSegmentedButton(f, values=["1학년","2학년","3학년","4학년"],
+        ctk.CTkSegmentedButton(f, values=["1학년", "2학년", "3학년", "4학년"],
                                variable=self._year_var,
                                font=ctk.CTkFont(size=11)
-                               ).pack(pady=(4,10), padx=12, fill="x")
+                               ).pack(pady=(4, 10), padx=12, fill="x")
 
     def _build_track(self):
         f = self._section("🔀 전공 트랙",
                           subtitle="2학년 때 어느 전공으로 갈 예정인가요?")
         self._track_var = ctk.StringVar(value="소프트웨어")
-        ctk.CTkSegmentedButton(f, values=["소프트웨어","헬스케어"],
+        ctk.CTkSegmentedButton(f, values=["소프트웨어", "헬스케어"],
                                variable=self._track_var,
                                font=ctk.CTkFont(size=12)
-                               ).pack(pady=(6,6), padx=12, fill="x")
+                               ).pack(pady=(6, 6), padx=12, fill="x")
         self._track_hint = ctk.CTkLabel(f, text="",
                                         font=ctk.CTkFont(size=10),
                                         text_color="#aaa", wraplength=290,
                                         justify="left")
-        self._track_hint.pack(padx=12, pady=(0,8), anchor="w")
+        self._track_hint.pack(padx=12, pady=(0, 8), anchor="w")
         self._track_var.trace_add("write", lambda *_: self._update_track_hint())
         self._update_track_hint()
 
@@ -116,7 +116,7 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         ]
         for label, color, courses in groups:
             ctk.CTkLabel(f, text=label, font=ctk.CTkFont(size=10),
-                         text_color=color).pack(padx=12, pady=(6,2), anchor="w")
+                         text_color=color).pack(padx=12, pady=(6, 2), anchor="w")
             for nm in courses:
                 var = ctk.BooleanVar(value=False)
                 self._major_vars[nm] = var
@@ -127,22 +127,31 @@ class SettingsPanel(ctk.CTkScrollableFrame):
 
     def _build_liberal(self):
         f = self._section("📋 교양필수 선택",
-                          subtitle="각 역량에서 한 학기에 1개씩 권장")
+                          subtitle="영역 선택 시 충돌 없는 과목을 자동 배정합니다")
         self._lib_vars = {}
 
-        groups = [
-            ("── 공동체 역량 (택1) ──",   "#888", LIBERAL_COMMUNITY),
-            ("── 소통공감 역량 (택1) ──", "#888", LIBERAL_COMMUNICATION),
-        ]
-        for label, color, courses in groups:
-            ctk.CTkLabel(f, text=label, font=ctk.CTkFont(size=10),
-                         text_color=color).pack(padx=12, pady=(6,2), anchor="w")
-            for nm in courses:
-                var = ctk.BooleanVar(value=False)
-                self._lib_vars[nm] = var
-                ctk.CTkCheckBox(f, text=nm, variable=var,
-                                font=ctk.CTkFont(size=11)
-                                ).pack(pady=2, padx=20, anchor="w")
+        # 영역별 안내 문구
+        hints = {
+            "VERUM인성:그리스도교문화": "공동체 역량 · 2학점",
+            "VERUM인간 (인간학)":       "공동체 역량 · 2학점 · 7개 과목 중 자동 배정",
+            "디지털소통":               "소통·공감 역량 · 2학점 · 33개 과목 중 자동 배정",
+            "디지털시대의사고와표현":   "소통·공감 역량 · 2학점 · 4개 과목 중 자동 배정",
+        }
+
+        for nm in LIBERAL_AREAS:
+            var = ctk.BooleanVar(value=False)
+            self._lib_vars[nm] = var
+
+            row_f = ctk.CTkFrame(f, fg_color="transparent")
+            row_f.pack(pady=(4, 0), padx=12, fill="x")
+
+            ctk.CTkCheckBox(row_f, text=nm, variable=var,
+                            font=ctk.CTkFont(size=11)
+                            ).pack(anchor="w")
+            ctk.CTkLabel(row_f, text=hints.get(nm, ""),
+                         font=ctk.CTkFont(size=10), text_color="gray",
+                         justify="left").pack(padx=22, anchor="w")
+
         ctk.CTkFrame(f, height=6, fg_color="transparent").pack()
 
     def _build_conditions(self):
@@ -166,9 +175,9 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         f = self._section("📅 추천 결과")
         self._result_var = ctk.StringVar(value="🥇 균형형")
         ctk.CTkSegmentedButton(f,
-            values=["🥇 균형형","🥈 공강형","🥉 몰아듣기형"],
+            values=["🥇 균형형", "🥈 공강형", "🥉 몰아듣기형"],
             variable=self._result_var, font=ctk.CTkFont(size=11)
-        ).pack(pady=(0,10), padx=12, fill="x")
+        ).pack(pady=(0, 10), padx=12, fill="x")
 
     def _build_info_and_btn(self):
         self._info_lbl = ctk.CTkLabel(self, text="",
