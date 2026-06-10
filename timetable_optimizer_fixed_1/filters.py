@@ -27,9 +27,7 @@ _INVALID_REMARKS = [
 ]
 
 # 비고 조건과 무관하게 수강 가능한 과목 (학교 측 예외 처리)
-_REMARK_EXCEPTIONS = [
-    "VERUM인성:그리스도교문화",
-]
+_REMARK_EXCEPTIONS = []
 
 
 def is_valid_grade(row: dict) -> bool:
