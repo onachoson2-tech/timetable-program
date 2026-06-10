@@ -22,7 +22,7 @@ class TimetableCanvas:
     # ── 공개 메서드 ────────────────────────────────────
 
     def show(self, subject_profs: list):
-        """(과목명, 교수) 튜플 목록을 받아 알고리즘이 선택한 분반 그대로 시간표를 그림"""
+        """(과목명, 교수명_분반번호) 튜플 목록을 받아 시간표를 그림"""
         self._subject_profs = subject_profs
         self._draw()
 
@@ -99,9 +99,21 @@ class TimetableCanvas:
         cmap = {nm: COLORS[i % len(COLORS)]
                 for i, nm in enumerate(names)}
 
-        for nm, prof in self._subject_profs:
-            # 알고리즘이 선택한 교수(분반)의 수업만 표시
-            rows = df[(df["과목명"] == nm) & (df["교수"] == prof)]
+        for nm, prof_key in self._subject_profs:
+            # "교수명_분반번호" 형태에서 교수명과 분반번호 분리
+            # 예) "이기영_2" → 교수명="이기영", 분반=2
+            try:
+                last_sep = prof_key.rfind("_")
+                prof_name = prof_key[:last_sep]
+                ban       = int(prof_key[last_sep + 1:])
+            except Exception:
+                continue
+
+            rows = df[
+                (df["과목명"] == nm) &
+                (df["교수"]   == prof_name) &
+                (df["분반"]   == ban)
+            ]
             if rows.empty:
                 continue
 
