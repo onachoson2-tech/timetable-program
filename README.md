@@ -16,7 +16,7 @@ GitHub: https://github.com/onachoson2-tech/timetable-program
 
 - 기본 구동 완료
 - 버그 수정 및 코드 개선 진행 중
-- data.csv 실데이터 입력 진행 중
+- data.csv 실데이터 입력 완료 (총 391개 행)
 
 ---
 
@@ -229,7 +229,6 @@ timetable_optimizer/
 
 | 항목 | 상태 |
 |------|------|
-| 교양과 과목 | ⏳ 예정 (필요시 추가) |
 | 기타 학과 전공 과목 | ⏳ 예정 |
 
 ---
