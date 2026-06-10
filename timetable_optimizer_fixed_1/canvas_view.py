@@ -100,10 +100,10 @@ class TimetableCanvas:
                 for i, nm in enumerate(names)}
 
         for nm, prof_key in self._subject_profs:
-            # "교수명_분반번호" 형태에서 교수명과 분반번호 분리
+            # "교수명_분반번호" 에서 교수명과 분반번호 분리
             # 예) "이기영_2" → 교수명="이기영", 분반=2
             try:
-                last_sep = prof_key.rfind("_")
+                last_sep  = prof_key.rfind("_")
                 prof_name = prof_key[:last_sep]
                 ban       = int(prof_key[last_sep + 1:])
             except Exception:
@@ -147,17 +147,38 @@ class TimetableCanvas:
                 room = str(row.get("강의실", ""))
                 room = "" if room == "nan" else room
 
-                if bh > 55:
-                    c.create_text(x0 + dw // 2, y0 + bh // 2 - 14,
-                                  text=nm, fill="white",
-                                  font=("맑은 고딕", 13, "bold"),
-                                  width=dw - 8)
-                    c.create_text(x0 + dw // 2, y0 + bh // 2 + 14,
-                                  text=room, fill="#eee",
-                                  font=("맑은 고딕", 11),
-                                  width=dw - 8)
-                elif bh > 28:
-                    c.create_text(x0 + dw // 2, y0 + bh // 2,
+                cx = x0 + dw // 2   # 블록 가로 중심
+
+                if bh >= 80:
+                    # 과목명 + 교수명 + 강의실 모두 표시
+                    c.create_text(cx, y0 + bh // 2 - 18,
                                   text=nm, fill="white",
                                   font=("맑은 고딕", 12, "bold"),
+                                  width=dw - 8)
+                    c.create_text(cx, y0 + bh // 2 + 2,
+                                  text=prof_name, fill="#ddd",
+                                  font=("맑은 고딕", 10),
+                                  width=dw - 8)
+                    if room:
+                        c.create_text(cx, y0 + bh // 2 + 20,
+                                      text=room, fill="#bbb",
+                                      font=("맑은 고딕", 9),
+                                      width=dw - 8)
+
+                elif bh >= 50:
+                    # 과목명 + 교수명 표시
+                    c.create_text(cx, y0 + bh // 2 - 9,
+                                  text=nm, fill="white",
+                                  font=("맑은 고딕", 11, "bold"),
+                                  width=dw - 8)
+                    c.create_text(cx, y0 + bh // 2 + 9,
+                                  text=prof_name, fill="#ddd",
+                                  font=("맑은 고딕", 9),
+                                  width=dw - 8)
+
+                elif bh >= 28:
+                    # 과목명만 표시
+                    c.create_text(cx, y0 + bh // 2,
+                                  text=nm, fill="white",
+                                  font=("맑은 고딕", 10, "bold"),
                                   width=dw - 8)
