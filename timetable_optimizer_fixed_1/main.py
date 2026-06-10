@@ -8,9 +8,41 @@ import customtkinter as ctk
 from ui_panel    import SettingsPanel
 from canvas_view import TimetableCanvas
 from algorithm   import generate_timetables, get_reason
+from config      import (MAX_CREDITS, MAX_CREDITS_HONOR,
+                         LIBERAL_AREA_COUNT, LIBERAL_AREA_DOMAINS)
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
+
+# 과목명 → 학점 매핑 (전공 과목 사전 학점 계산용)
+_MAJOR_CREDITS = {
+    "프로그래밍기초":           3,
+    "데이터리터러시와기초통계": 2,
+    "데이터리터러시실습":       2,
+    "AI소프트웨어개론":         3,
+    "디지털헬스와사회":         2,
+    "사제동행세미나1":          0.5,
+}
+
+# 교양필수 영역 → 학점 매핑
+_LIBERAL_CREDITS = {
+    "VERUM인성:그리스도교문화": 2,
+    "VERUM인간 (인간학)":       4,   # 2과목 × 2학점
+    "디지털소통":               4,   # 2과목 × 2학점
+    "디지털시대의사고와표현":   2,
+}
+
+
+def _calc_selected_credits(prefs: dict) -> tuple:
+    """
+    선택한 전공 과목 학점 합계와 교양필수 학점 합계를 반환.
+    반환: (major_cr, liberal_cr)
+    """
+    major_cr   = sum(_MAJOR_CREDITS.get(nm, 2)
+                     for nm in prefs.get("selected_major", []))
+    liberal_cr = sum(_LIBERAL_CREDITS.get(area, 2)
+                     for area in prefs.get("selected_liberal", []))
+    return major_cr, liberal_cr
 
 
 class App(ctk.CTk):
@@ -28,11 +60,9 @@ class App(ctk.CTk):
     # ── 레이아웃 구성 ──────────────────────────────────
 
     def _build_layout(self):
-        # 왼쪽 설정 패널
         self.panel = SettingsPanel(self, on_generate_cb=self._on_generate_click)
         self.panel.pack(side="left", fill="y")
 
-        # 오른쪽 영역
         right = ctk.CTkFrame(self, corner_radius=0, fg_color="#0f0f1a")
         right.pack(side="right", fill="both", expand=True)
 
@@ -51,15 +81,59 @@ class App(ctk.CTk):
     # ── 이벤트 핸들러 ──────────────────────────────────
 
     def _on_generate_click(self):
-        """생성 버튼 클릭 → 별도 스레드에서 탐색 실행"""
+        """생성 버튼 클릭 → 학점 경고 검사 후 탐색 실행"""
+        prefs = self.panel.get_preferences()
+
+        # 학점 경고 검사
+        warning = self._check_credit_warning(prefs)
+        if warning:
+            self.panel.set_info(warning)
+            # 경고가 있어도 탐색은 계속 진행
         threading.Thread(target=self._run_search, daemon=True).start()
+
+    def _check_credit_warning(self, prefs: dict) -> str:
+        """
+        전공 + 교양필수 학점 합계가 최대 수강 학점을 초과하거나
+        교양선택 여유가 없으면 경고 문자열 반환.
+        정상이면 빈 문자열 반환.
+        """
+        honor    = prefs.get("honor_student", False)
+        max_cr   = MAX_CREDITS_HONOR if honor else MAX_CREDITS
+
+        major_cr, liberal_cr = _calc_selected_credits(prefs)
+        total_fixed = major_cr + liberal_cr
+
+        if total_fixed > max_cr:
+            return (
+                f"⚠️ 전공 {major_cr}학점 + 교양필수 {liberal_cr}학점 "
+                f"= {total_fixed}학점으로\n"
+                f"최대 수강학점({max_cr}학점)을 초과합니다.\n"
+                f"교양필수 선택을 줄이거나 전공 과목을 조정해주세요."
+            )
+
+        # 교양선택 여유 학점이 2학점 미만이면 경고
+        remaining = max_cr - total_fixed
+        if remaining < 2 and len(prefs.get("selected_liberal", [])) > 0:
+            return (
+                f"⚠️ 전공 {major_cr}학점 + 교양필수 {liberal_cr}학점 "
+                f"= {total_fixed}학점\n"
+                f"교양선택 여유 학점이 {remaining}학점으로 부족합니다.\n"
+                f"교양필수 선택을 줄이는 것을 권장합니다."
+            )
+
+        return ""
 
     def _run_search(self):
         self.panel.set_btn_state(generating=True)
-        self.panel.set_info("최적 시간표를 탐색하고 있습니다...")
 
         prefs  = self.panel.get_preferences()
         honor  = prefs.get("honor_student", False)
+
+        # 경고가 없을 때만 탐색 중 메시지 표시
+        warning = self._check_credit_warning(prefs)
+        if not warning:
+            self.panel.set_info("최적 시간표를 탐색하고 있습니다...")
+
         results = generate_timetables(prefs, honor)
 
         self._results = results
