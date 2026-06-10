@@ -14,14 +14,14 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         super().__init__(parent, width=340, corner_radius=0, **kwargs)
         self._on_generate = on_generate_cb
         self._major_vars: dict = {}
-        self._major_cbs:  dict = {}   # {과목명: CTkCheckBox 위젯}
+        self._major_cbs:  dict = {}
         self._build()
 
     # ── 공개 메서드 ────────────────────────────────────
 
     def get_preferences(self) -> dict:
         return {
-            "year":             self._year_var.get(),
+            "year":             "1학년",
             "track":            self._track_var.get(),
             "selected_major":   [nm for nm, v in self._major_vars.items() if v.get()],
             "selected_liberal": [nm for nm, v in self._lib_vars.items() if v.get()],
@@ -81,12 +81,11 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         self._on_track_change()
 
     def _build_year(self):
-        f = self._section("📚 학년 선택")
-        self._year_var = ctk.StringVar(value="1학년")
-        ctk.CTkSegmentedButton(f, values=["1학년", "2학년", "3학년", "4학년"],
-                               variable=self._year_var,
-                               font=ctk.CTkFont(size=11)
-                               ).pack(pady=(4, 10), padx=12, fill="x")
+        f = self._section("📚 학년")
+        ctk.CTkLabel(f, text="1학년 (고정)",
+                     font=ctk.CTkFont(size=12),
+                     text_color="#88ccff"
+                     ).pack(pady=(4, 10), padx=12, anchor="w")
 
     def _build_track(self):
         f = self._section("🔀 전공 트랙",
@@ -109,21 +108,17 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         self._track_hint.configure(text=TRACK_HINTS.get(track, ""))
 
         if track == "소프트웨어":
-            # SW 과목: 자동 체크 + 비활성화
             for nm in SW_COURSES:
                 self._major_vars[nm].set(True)
                 self._major_cbs[nm].configure(state="disabled")
-            # HC 과목: 체크 해제 + 활성화
             for nm in HC_COURSES:
                 self._major_vars[nm].set(False)
                 self._major_cbs[nm].configure(state="normal")
 
         elif track == "헬스케어":
-            # HC 과목: 자동 체크 + 비활성화
             for nm in HC_COURSES:
                 self._major_vars[nm].set(True)
                 self._major_cbs[nm].configure(state="disabled")
-            # SW 과목: 체크 해제 + 활성화
             for nm in SW_COURSES:
                 self._major_vars[nm].set(False)
                 self._major_cbs[nm].configure(state="normal")
