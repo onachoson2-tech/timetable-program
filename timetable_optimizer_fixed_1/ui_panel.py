@@ -13,6 +13,8 @@ class SettingsPanel(ctk.CTkScrollableFrame):
     def __init__(self, parent, on_generate_cb, **kwargs):
         super().__init__(parent, width=340, corner_radius=0, **kwargs)
         self._on_generate = on_generate_cb
+        self._major_vars: dict = {}
+        self._major_cbs:  dict = {}   # {과목명: CTkCheckBox 위젯}
         self._build()
 
     # ── 공개 메서드 ────────────────────────────────────
@@ -60,7 +62,6 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         return f
 
     def _build(self):
-        # 제목
         ctk.CTkLabel(self, text="🎓 CKU 시간표 최적화",
                      font=ctk.CTkFont(size=17, weight="bold")
                      ).pack(pady=(16, 2), padx=14)
@@ -75,6 +76,9 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         self._build_conditions()
         self._build_result_selector()
         self._build_info_and_btn()
+
+        # 초기 트랙 상태 적용
+        self._on_track_change()
 
     def _build_year(self):
         f = self._section("📚 학년 선택")
@@ -97,17 +101,36 @@ class SettingsPanel(ctk.CTkScrollableFrame):
                                         text_color="#aaa", wraplength=290,
                                         justify="left")
         self._track_hint.pack(padx=12, pady=(0, 8), anchor="w")
-        self._track_var.trace_add("write", lambda *_: self._update_track_hint())
-        self._update_track_hint()
+        self._track_var.trace_add("write", lambda *_: self._on_track_change())
 
-    def _update_track_hint(self):
-        self._track_hint.configure(
-            text=TRACK_HINTS.get(self._track_var.get(), ""))
+    def _on_track_change(self):
+        """트랙 변경 시 전공 과목 체크 상태 및 활성화 여부 자동 조정"""
+        track = self._track_var.get()
+        self._track_hint.configure(text=TRACK_HINTS.get(track, ""))
+
+        if track == "소프트웨어":
+            # SW 과목: 자동 체크 + 비활성화
+            for nm in SW_COURSES:
+                self._major_vars[nm].set(True)
+                self._major_cbs[nm].configure(state="disabled")
+            # HC 과목: 체크 해제 + 활성화
+            for nm in HC_COURSES:
+                self._major_vars[nm].set(False)
+                self._major_cbs[nm].configure(state="normal")
+
+        elif track == "헬스케어":
+            # HC 과목: 자동 체크 + 비활성화
+            for nm in HC_COURSES:
+                self._major_vars[nm].set(True)
+                self._major_cbs[nm].configure(state="disabled")
+            # SW 과목: 체크 해제 + 활성화
+            for nm in SW_COURSES:
+                self._major_vars[nm].set(False)
+                self._major_cbs[nm].configure(state="normal")
 
     def _build_major(self):
         f = self._section("📌 전공 과목 선택",
-                          subtitle="트랙 기준에 따라 선택해주세요")
-        self._major_vars = {}
+                          subtitle="필수 과목은 트랙에 따라 자동 선택됩니다")
 
         groups = [
             ("── 소프트웨어 전공 과목 ──", "#64B5F6", SW_COURSES),
@@ -120,9 +143,11 @@ class SettingsPanel(ctk.CTkScrollableFrame):
             for nm in courses:
                 var = ctk.BooleanVar(value=False)
                 self._major_vars[nm] = var
-                ctk.CTkCheckBox(f, text=nm, variable=var,
-                                font=ctk.CTkFont(size=11)
-                                ).pack(pady=2, padx=20, anchor="w")
+                cb = ctk.CTkCheckBox(f, text=nm, variable=var,
+                                     font=ctk.CTkFont(size=11))
+                cb.pack(pady=2, padx=20, anchor="w")
+                self._major_cbs[nm] = cb
+
         ctk.CTkFrame(f, height=6, fg_color="transparent").pack()
 
     def _build_liberal(self):
@@ -130,7 +155,6 @@ class SettingsPanel(ctk.CTkScrollableFrame):
                           subtitle="영역 선택 시 충돌 없는 과목을 자동 배정합니다")
         self._lib_vars = {}
 
-        # 영역별 안내 문구
         hints = {
             "VERUM인성:그리스도교문화": "공동체 역량 · 2학점",
             "VERUM인간 (인간학)":       "공동체 역량 · 2학점 · 7개 과목 중 자동 배정",
