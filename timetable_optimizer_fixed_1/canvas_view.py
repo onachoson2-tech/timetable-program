@@ -153,32 +153,32 @@ class TimetableCanvas:
                     # 과목명 + 교수명 + 강의실 모두 표시
                     c.create_text(cx, y0 + bh // 2 - 18,
                                   text=nm, fill="white",
-                                  font=("맑은 고딕", 12, "bold"),
+                                  font=("맑은 고딕", 14, "bold"),
                                   width=dw - 8)
                     c.create_text(cx, y0 + bh // 2 + 2,
                                   text=prof_name, fill="#ddd",
-                                  font=("맑은 고딕", 10),
+                                  font=("맑은 고딕", 11),
                                   width=dw - 8)
                     if room:
                         c.create_text(cx, y0 + bh // 2 + 20,
                                       text=room, fill="#bbb",
-                                      font=("맑은 고딕", 9),
+                                      font=("맑은 고딕", 10),
                                       width=dw - 8)
 
                 elif bh >= 50:
                     # 과목명 + 교수명 표시
                     c.create_text(cx, y0 + bh // 2 - 9,
                                   text=nm, fill="white",
-                                  font=("맑은 고딕", 11, "bold"),
+                                  font=("맑은 고딕", 13, "bold"),
                                   width=dw - 8)
-                    c.create_text(cx, y0 + bh // 2 + 9,
+                    c.create_text(cx, y0 + bh // 2 + 11,
                                   text=prof_name, fill="#ddd",
-                                  font=("맑은 고딕", 9),
+                                  font=("맑은 고딕", 11),
                                   width=dw - 8)
 
                 elif bh >= 28:
                     # 과목명만 표시
                     c.create_text(cx, y0 + bh // 2,
                                   text=nm, fill="white",
-                                  font=("맑은 고딕", 10, "bold"),
+                                  font=("맑은 고딕", 11, "bold"),
                                   width=dw - 8)
