@@ -71,7 +71,7 @@ LIBERAL_AREA_DOMAINS = {
 #   나머지는 1과목 이수
 LIBERAL_AREA_COUNT = {
     "VERUM인성:그리스도교문화": 1,
-    "VERUM인간 (인간학)":       2,
+    "VERUM인간 (인간학)":       1,
     "디지털소통":               2,
     "디지털시대의사고와표현":   1,
 }
