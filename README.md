@@ -28,6 +28,8 @@ GitHub: https://github.com/onachoson2-tech/timetable-program
 - 탐색 15초 타임아웃 적용 완료
 - 사제동행세미나 수강신청 학점 미포함 규정 반영 완료 (최대 18.5학점 / honor 21.5학점)
 - 실행 테스트 완료 — 주요 버그 수정 완료
+- 트리니티전용 수강 자격 수정 완료 (AI소프트웨어융합학부 트리니티융합 포함)
+- 생성 버튼 클릭 시 다양한 시간표 순환 표시 적용 완료
 
 ---
 
@@ -273,6 +275,12 @@ timetable_optimizer_fixed_1/
 | `main.py`, `config.py` — 사제동행세미나 수강신청 학점 미포함 규정 반영 (MAX_CREDITS 18→18.5, MAX_CREDITS_HONOR 21→21.5) | ✅ 완료 |
 | `main.py` — _MAJOR_CREDITS에서 사제동행세미나1 제거 (학점 경고 계산 시 제외) | ✅ 완료 |
 | `ui_panel.py` — 직전학기 4.0이상 안내 문구 21학점 → 21.5학점 수정 | ✅ 완료 |
+| `filters.py`, `data_loader.py` — _INVALID_REMARKS에서 트리니티전용 제거 (AI소프트웨어융합학부 트리니티융합 포함) | ✅ 완료 |
+| `main.py` — 학점 초과 시 탐색 중단 제거, 경고 안내 후 탐색 진행으로 변경 | ✅ 완료 |
+| `algorithm.py` — 교양필수 배정 시 학점 한도 초과 검사 추가 (한도 내 자동 조정) | ✅ 완료 |
+| `algorithm.py` — _pick_three() 제거, 전체 결과 중복 제거 후 랜덤 셔플 반환으로 변경 | ✅ 완료 |
+| `main.py` — 생성 버튼 클릭 시 결과 순환, 조건 변경 시 인덱스 초기화 | ✅ 완료 |
+| `ui_panel.py` — 균형형·공강형·몰아듣기형 추천 결과 탭 제거 | ✅ 완료 |
 
 ---
 
