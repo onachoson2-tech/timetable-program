@@ -161,16 +161,75 @@ def _build_opt_candidates(df, fixed_rows: list, fixed_names: set,
 
 # ── 메인 탐색 함수 ─────────────────────────────────────
 
+def _build_liberal_combos(df, selected_liberal: list, fixed_rows: list,
+                          fixed_names: set, prefs: dict, max_cr: float,
+                          fixed_cr: float) -> list:
+    """
+    선택된 교양필수 영역에서 영역별 제약(LIBERAL_AREA_COUNT)을 만족하는
+    모든 과목 조합을 생성한다.
+
+    반환: [ [(과목명, key, rows), ...], ... ]
+      각 원소는 하나의 교양필수 조합 (여러 과목 포함 가능)
+    """
+    from itertools import product as iproduct
+
+    area_options = []  # 영역별 후보 조합 목록
+
+    for area in selected_liberal:
+        domain = LIBERAL_AREA_DOMAINS.get(area)
+        if not domain:
+            continue
+        count     = LIBERAL_AREA_COUNT.get(area, 1)
+        domain_df = get_courses_by_domain(df, domain)
+
+        # 해당 영역에서 수강 가능한 과목 목록 (전공과 충돌 없는 것)
+        area_candidates = []
+        for _, row in domain_df.iterrows():
+            nm = row["과목명"]
+            if nm in fixed_names:
+                continue
+            branches = get_subject_branches(df, nm)
+            for key, branch_rows in branches.items():
+                if not passes_filters(branch_rows, prefs):
+                    continue
+                if conflicts_with_fixed(branch_rows, fixed_rows):
+                    continue
+                area_candidates.append((nm, key, branch_rows))
+                break
+
+        if not area_candidates:
+            return []  # 해당 영역에서 배정 불가 → 전체 조합 없음
+
+        # 영역에서 count개 선택하는 모든 조합
+        combos = list(combinations(area_candidates, count))
+        if not combos:
+            return []
+        area_options.append(combos)
+
+    if not area_options:
+        return [[] ]  # 교양필수 선택 없음 → 빈 조합 1개
+
+    # 각 영역의 조합을 곱으로 결합
+    liberal_combos = []
+    for combo_tuple in iproduct(*area_options):
+        # combo_tuple: 각 영역에서 선택된 과목 조합들의 튜플
+        merged = []
+        for area_combo in combo_tuple:
+            merged.extend(area_combo)
+        liberal_combos.append(merged)
+
+    return liberal_combos
+
+
 def generate_timetables(preferences: dict, honor_student: bool = False,
                         seen_keys: set = None) -> tuple:
     """
-    최대 1초 탐색 후 찾은 결과를 반환.
-    seen_keys: 이미 찾은 결과의 키 집합 (누적 탐색 시 중복 제거용)
+    전공 과목을 고정하고, 교양필수+교양선택 조합을 함께 탐색.
+    1초 내에 찾은 새 결과를 반환.
 
     반환: (results, exhausted)
       results   : [(subject_profs, free_days, total_credits), ...]
-      exhausted : 모든 경우의 수를 다 찾은 경우 True
-      subject_profs: [(과목명, 교수명_분반번호), ...]
+      exhausted : 새 결과가 0개인 경우 True (더 이상 찾을 것 없음)
     """
     TIMEOUT_SEC = 1
 
@@ -183,10 +242,10 @@ def generate_timetables(preferences: dict, honor_student: bool = False,
 
     start_time = time.time()
 
-    # 전공 과목을 단일분반/다분반으로 분리
+    # ── 1. 전공 과목 고정 ──────────────────────────────
+    # 단일분반/다분반 분리
     single_majors = []
     multi_majors  = []
-
     for nm in preferences.get("selected_major", []):
         branches = get_subject_branches(df, nm)
         valid = list(branches.items())
@@ -195,7 +254,7 @@ def generate_timetables(preferences: dict, honor_student: bool = False,
         else:
             multi_majors.append((nm, valid))
 
-    # 다분반 과목 분반 조합 — 랜덤 셔플
+    # 다분반 조합 생성 후 랜덤 셔플
     from itertools import product as iproduct
     if multi_majors:
         multi_names   = [nm for nm, _ in multi_majors]
@@ -218,11 +277,11 @@ def generate_timetables(preferences: dict, honor_student: bool = False,
         fixed_names: set  = set()
         fixed_profs: dict = {}
 
-        # 1. 단일분반 전공 과목 추가
+        # 단일분반 전공 과목 추가
         for nm in single_majors:
             _add_subject(df, nm, fixed_rows, fixed_names, fixed_profs, {})
 
-        # 2. 다분반 전공 과목 — 이번 조합의 분반으로 고정
+        # 다분반 전공 과목 추가
         skip_combo = False
         for nm, (key, rows) in zip(multi_names, branch_combo):
             if has_any_conflict(fixed_rows + rows):
@@ -234,82 +293,95 @@ def generate_timetables(preferences: dict, honor_student: bool = False,
         if skip_combo:
             continue
 
-        # 3. 교양필수 영역에서 과목 랜덤 배정
-        for area in preferences.get("selected_liberal", []):
-            domain = LIBERAL_AREA_DOMAINS.get(area)
-            if not domain:
+        fixed_cr = _sum_credits(fixed_rows, fixed_names)
+
+        # ── 2. 교양필수 조합 생성 ──────────────────────
+        liberal_combos = _build_liberal_combos(
+            df, preferences.get("selected_liberal", []),
+            fixed_rows, fixed_names, prefs, max_cr, fixed_cr)
+
+        random.shuffle(liberal_combos)
+
+        for lib_combo in liberal_combos:
+            if time.time() - start_time > TIMEOUT_SEC:
+                timed_out = True
+                break
+
+            # 교양필수 조합 내부 충돌 검사
+            lib_rows_all = [row for _, _, rows in lib_combo for row in rows]
+            if has_internal_conflict(lib_rows_all):
                 continue
-            count     = LIBERAL_AREA_COUNT.get(area, 1)
-            assigned  = 0
-            domain_df = get_courses_by_domain(df, domain)
+            if conflicts_with_fixed(lib_rows_all, fixed_rows):
+                continue
 
-            for _, row in domain_df.sample(frac=1).iterrows():
-                if assigned >= count:
+            # 교양필수 학점 합산
+            lib_cr = sum(float(rows[0].get("학점", 0)) for _, _, rows in lib_combo)
+            if fixed_cr + lib_cr > max_cr:
+                continue
+
+            # 교양필수 과목명 중복 검사 (디지털소통 2과목이 같은 과목이면 제외)
+            lib_names = [nm for nm, _, _ in lib_combo]
+            if len(lib_names) != len(set(lib_names)):
+                continue
+
+            # 교양필수 적용 후 fixed 세트 구성
+            lib_fixed_rows  = fixed_rows  + lib_rows_all
+            lib_fixed_names = fixed_names | set(lib_names)
+            lib_fixed_profs = {**fixed_profs,
+                               **{nm: key for nm, key, _ in lib_combo}}
+
+            remaining = max_cr - fixed_cr - lib_cr
+
+            # ── 3. 교양선택 후보 생성 ──────────────────
+            candidates = _build_opt_candidates(
+                df, lib_fixed_rows, lib_fixed_names, prefs)
+            random.shuffle(candidates)
+
+            if candidates:
+                min_cr = min(float(c[2][0].get("학점", 1)) for c in candidates)
+                max_r  = min(6, int(remaining // min_cr))
+            else:
+                max_r = 0
+
+            # ── 4. 교양선택 조합 탐색 ──────────────────
+            for r in range(0, max_r + 1):
+                for combo in combinations(candidates, r):
+                    if time.time() - start_time > TIMEOUT_SEC:
+                        timed_out = True
+                        break
+
+                    combo_cr = sum(float(c[2][0].get("학점", 0)) for c in combo)
+                    if combo_cr > remaining:
+                        continue
+
+                    # 사이버강좌 2과목 초과 제외
+                    cyber_count = sum(
+                        1 for _, _, rows in combo
+                        if all(str(row.get("요일", "")) in ("", "nan") for row in rows)
+                    )
+                    if cyber_count > 2:
+                        continue
+
+                    combo_rows = [row for _, _, rows in combo for row in rows]
+                    if has_internal_conflict(combo_rows):
+                        continue
+                    if conflicts_with_fixed(combo_rows, lib_fixed_rows):
+                        continue
+
+                    subject_profs = (
+                        [(nm, lib_fixed_profs[nm]) for nm in lib_fixed_names]
+                        + [(nm, key) for nm, key, _ in combo]
+                    )
+
+                    result_key = tuple(sorted((nm, prof) for nm, prof in subject_profs))
+                    if result_key not in seen_keys:
+                        seen_keys.add(result_key)
+                        all_rows = lib_fixed_rows + combo_rows
+                        free, _, _, total = calc_timetable_stats(all_rows)
+                        new_results.append((subject_profs, free, total))
+
+                if timed_out:
                     break
-                nm = row["과목명"]
-                if nm in fixed_names:
-                    continue
-                current_cr = _sum_credits(fixed_rows, fixed_names)
-                subject_cr = float(row.get("학점", 0))
-                if current_cr + subject_cr > max_cr:
-                    continue
-                result = pick_best_branch(df, nm, fixed_rows, prefs)
-                if result:
-                    k, branch = result
-                    fixed_rows.extend(branch)
-                    fixed_names.add(nm)
-                    fixed_profs[nm] = k
-                    assigned += 1
-
-        # 4. 남은 학점 계산
-        fixed_cr  = _sum_credits(fixed_rows, fixed_names)
-        remaining = max_cr - fixed_cr
-
-        # 5. 교양선택 후보 사전 정리 후 랜덤 셔플
-        candidates = _build_opt_candidates(df, fixed_rows, fixed_names, prefs)
-        random.shuffle(candidates)
-
-        # 6. 남은 학점으로 가능한 최대 r 동적 계산
-        if candidates:
-            min_cr = min(float(c[2][0].get("학점", 1)) for c in candidates)
-            max_r  = min(6, int(remaining // min_cr))
-        else:
-            max_r = 0
-
-        # 7. 조합 탐색 — 1초 내 찾은 결과 수집 (이미 찾은 결과 제외)
-        for r in range(0, max_r + 1):
-            for combo in combinations(candidates, r):
-                if time.time() - start_time > TIMEOUT_SEC:
-                    timed_out = True
-                    break
-
-                combo_cr = sum(float(c[2][0].get("학점", 0)) for c in combo)
-                if combo_cr > remaining:
-                    continue
-
-                # 사이버강좌 2과목 초과 제외
-                cyber_count = sum(
-                    1 for _, _, rows in combo
-                    if all(str(row.get("요일", "")) in ("", "nan") for row in rows)
-                )
-                if cyber_count > 2:
-                    continue
-
-                combo_rows = [row for _, _, rows in combo for row in rows]
-                if has_internal_conflict(combo_rows):
-                    continue
-
-                subject_profs = (
-                    [(nm, fixed_profs[nm]) for nm in fixed_names]
-                    + [(nm, key) for nm, key, _ in combo]
-                )
-                # 중복 키 확인 후 새 결과만 추가
-                result_key = tuple(sorted((nm, prof) for nm, prof in subject_profs))
-                if result_key not in seen_keys:
-                    seen_keys.add(result_key)
-                    all_rows = fixed_rows + combo_rows
-                    free, _, _, total = calc_timetable_stats(all_rows)
-                    new_results.append((subject_profs, free, total))
 
             if timed_out:
                 break
@@ -317,9 +389,7 @@ def generate_timetables(preferences: dict, honor_student: bool = False,
         if timed_out:
             break
 
-    # 새 결과가 없으면 더 이상 찾을 것이 없다고 판단
     exhausted = len(new_results) == 0
-
     random.shuffle(new_results)
     return new_results, exhausted
 
