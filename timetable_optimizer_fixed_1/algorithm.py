@@ -190,7 +190,7 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
         assigned  = 0
         domain_df = get_courses_by_domain(df, domain)
 
-        for _, row in domain_df.iterrows():
+        for _, row in domain_df.sample(frac=1).iterrows():
             if assigned >= count:
                 break
             nm = row["과목명"]
