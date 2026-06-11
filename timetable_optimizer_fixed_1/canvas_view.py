@@ -36,6 +36,34 @@ class TimetableCanvas:
     def _on_resize(self, _event):
         self._draw()
 
+    def _get_online_subjects(self, df) -> list:
+        """
+        요일 정보가 없는 과목(온라인 강좌) 목록 반환.
+        반환: [(과목명, 학점), ...]
+        """
+        online = []
+        for nm, prof_key in self._subject_profs:
+            try:
+                last_sep  = prof_key.rfind("_")
+                prof_name = prof_key[:last_sep]
+                ban       = int(prof_key[last_sep + 1:])
+            except Exception:
+                continue
+
+            rows = df[
+                (df["과목명"] == nm) &
+                (df["교수"]   == prof_name) &
+                (df["분반"]   == ban)
+            ]
+            if rows.empty:
+                continue
+
+            days = [str(r["요일"]) for _, r in rows.iterrows()]
+            if all(d in ("", "nan") for d in days):
+                cr = float(rows.iloc[0].get("학점", 0))
+                online.append((nm, cr))
+        return online
+
     def _draw(self):
         c = self.canvas
         c.delete("all")
@@ -45,11 +73,21 @@ class TimetableCanvas:
         if W < 100 or H < 50:
             return
 
-        n_slots = TIMETABLE_END_H - TIMETABLE_START_H
-        dw = (W - self.TIME_W) // 5          # 요일 열 너비
-        sh = (H - self.HDR) / n_slots        # 1시간 높이
+        df = load_data()
+        online = self._get_online_subjects(df) if self._subject_profs else []
+        has_online = len(online) > 0
 
-        self._draw_grid(c, W, H, dw, sh, n_slots)
+        n_slots = TIMETABLE_END_H - TIMETABLE_START_H
+
+        # 온라인 열이 있으면 시간표 가로 비율 축소 (6열 중 5열만 시간표)
+        if has_online:
+            dw = (W - self.TIME_W) // 6   # 요일 열 너비 (온라인 열 포함 6열)
+        else:
+            dw = (W - self.TIME_W) // 5   # 요일 열 너비 (5열)
+
+        sh = (H - self.HDR) / n_slots     # 1시간 높이
+
+        self._draw_grid(c, W, H, dw, sh, n_slots, has_online)
 
         if not self._subject_profs:
             c.create_text(W // 2, H // 2,
@@ -57,15 +95,16 @@ class TimetableCanvas:
                           fill="#444", font=("맑은 고딕", 15), justify="center")
             return
 
-        self._draw_courses(c, dw, sh)
-        self._draw_online(c, W, H)
+        self._draw_courses(c, dw, sh, df)
+        if has_online:
+            self._draw_online_col(c, dw, sh, online)
 
-    def _draw_grid(self, c, W, H, dw, sh, n_slots):
+    def _draw_grid(self, c, W, H, dw, sh, n_slots, has_online: bool):
         HDR, TIME_W = self.HDR, self.TIME_W
 
         c.create_rectangle(0, 0, W, H, fill="#0f0f1a", outline="")
 
-        # 요일 헤더
+        # 요일 헤더 (월~금)
         for i, day in enumerate(DAYS):
             x0 = TIME_W + i * dw
             c.create_rectangle(x0, 0, x0 + dw, HDR,
@@ -73,10 +112,19 @@ class TimetableCanvas:
             c.create_text(x0 + dw // 2, HDR // 2, text=day,
                           fill="white", font=("맑은 고딕", 11, "bold"))
 
+        # 온라인 열 헤더
+        if has_online:
+            ox = TIME_W + 5 * dw
+            c.create_rectangle(ox, 0, ox + dw, HDR,
+                                fill="#1c2030", outline="#2a2a45")
+            c.create_text(ox + dw // 2, HDR // 2, text="📡 온라인",
+                          fill="#aad4ff", font=("맑은 고딕", 10, "bold"))
+
         # 시간 눈금 + 가로선
+        grid_w = W if not has_online else TIME_W + 5 * dw
         for i in range(n_slots + 1):
             y = HDR + i * sh
-            c.create_line(TIME_W, y, W, y, fill="#1e1e35")
+            c.create_line(TIME_W, y, grid_w, y, fill="#1e1e35")
             if i < n_slots:
                 c.create_rectangle(0, y, TIME_W, y + sh,
                                    fill="#131320", outline="#1e1e35")
@@ -84,15 +132,19 @@ class TimetableCanvas:
                               text=f"{TIMETABLE_START_H + i}시",
                               fill="#555", font=("맑은 고딕", 9))
 
-        # 세로선
+        # 세로선 (월~금)
         for i in range(6):
             c.create_line(TIME_W + i * dw, HDR,
                           TIME_W + i * dw, H, fill="#1e1e35")
 
-    def _draw_courses(self, c, dw, sh):
+        # 온라인 열 오른쪽 세로선
+        if has_online:
+            c.create_line(TIME_W + 6 * dw, HDR,
+                          TIME_W + 6 * dw, H, fill="#1e1e35")
+
+    def _draw_courses(self, c, dw, sh, df):
         HDR, TIME_W = self.HDR, self.TIME_W
         base = TIMETABLE_START_H * 60
-        df   = load_data()
 
         names = [nm for nm, _ in self._subject_profs]
 
@@ -101,8 +153,6 @@ class TimetableCanvas:
                 for i, nm in enumerate(names)}
 
         for nm, prof_key in self._subject_profs:
-            # "교수명_분반번호" 에서 교수명과 분반번호 분리
-            # 예) "이기영_2" → 교수명="이기영", 분반=2
             try:
                 last_sep  = prof_key.rfind("_")
                 prof_name = prof_key[:last_sep]
@@ -128,7 +178,6 @@ class TimetableCanvas:
                 if s < 0 or e < 0:
                     continue
 
-                # 범위 클리핑
                 s = max(s, base)
                 e = min(e, TIMETABLE_END_H * 60)
                 if s >= e:
@@ -137,7 +186,6 @@ class TimetableCanvas:
                 di = DAYS.index(day)
                 x0 = TIME_W + di * dw
 
-                # 정수 픽셀로 반올림 → 틈 없음
                 y0 = round(HDR + (s - base) / 60 * sh)
                 y1 = round(HDR + (e - base) / 60 * sh)
 
@@ -147,11 +195,9 @@ class TimetableCanvas:
                 bh   = y1 - y0
                 room = str(row.get("강의실", ""))
                 room = "" if room == "nan" else room
-
-                cx = x0 + dw // 2   # 블록 가로 중심
+                cx   = x0 + dw // 2
 
                 if bh >= 80:
-                    # 과목명 + 교수명 + 강의실 모두 표시
                     c.create_text(cx, y0 + bh // 2 - 18,
                                   text=nm, fill="white",
                                   font=("맑은 고딕", 14, "bold"),
@@ -167,7 +213,6 @@ class TimetableCanvas:
                                       width=dw - 8)
 
                 elif bh >= 50:
-                    # 과목명 + 교수명 표시
                     c.create_text(cx, y0 + bh // 2 - 9,
                                   text=nm, fill="white",
                                   font=("맑은 고딕", 13, "bold"),
@@ -178,55 +223,40 @@ class TimetableCanvas:
                                   width=dw - 8)
 
                 elif bh >= 28:
-                    # 과목명만 표시
                     c.create_text(cx, y0 + bh // 2,
                                   text=nm, fill="white",
                                   font=("맑은 고딕", 11, "bold"),
                                   width=dw - 8)
 
-    def _draw_online(self, c, W, H):
-        """요일 정보가 없는 과목(온라인 강좌)을 캔버스 우하단에 별도 표시"""
-        df = load_data()
-        online_names = []
+    def _draw_online_col(self, c, dw, sh, online: list):
+        """온라인 강좌를 오른쪽 열에 위에서부터 순서대로 블록으로 표시"""
+        HDR, TIME_W = self.HDR, self.TIME_W
 
-        for nm, prof_key in self._subject_profs:
-            try:
-                last_sep  = prof_key.rfind("_")
-                prof_name = prof_key[:last_sep]
-                ban       = int(prof_key[last_sep + 1:])
-            except Exception:
-                continue
+        ox   = TIME_W + 5 * dw   # 온라인 열 x 시작
+        cx   = ox + dw // 2      # 온라인 열 가로 중심
+        BH   = round(sh * 1.5)   # 블록 높이 (1.5시간 분량)
+        PAD  = 4                  # 블록 간격
 
-            rows = df[
-                (df["과목명"] == nm) &
-                (df["교수"]   == prof_name) &
-                (df["분반"]   == ban)
-            ]
-            if rows.empty:
-                continue
+        names = [nm for nm, _ in self._subject_profs]
+        cmap  = {nm: COLORS[i % len(COLORS)] for i, nm in enumerate(names)}
 
-            # 모든 행의 요일이 비어있으면 온라인 강좌로 판단
-            days = [str(r["요일"]) for _, r in rows.iterrows()]
-            if all(d in ("", "nan") for d in days):
-                online_names.append(nm)
+        y = HDR + PAD
+        for nm, cr in online:
+            y1 = y + BH
+            color = cmap.get(nm, COLORS[0])
 
-        if not online_names:
-            return
+            c.create_rectangle(ox + 2, y, ox + dw - 2, y1,
+                               fill=color, outline="")
 
-        text = "📡 온라인 강좌:  " + "  /  ".join(online_names)
-        # 우하단 반투명 배경 박스
-        padding = 8
-        font = ("맑은 고딕", 10)
-        # 텍스트 너비 추정 (글자당 약 8px)
-        tw = len(text) * 8 + padding * 2
-        th = 22
-        x1 = W - padding
-        y1 = H - padding
-        x0 = max(self.TIME_W + padding, x1 - tw)
-        y0 = y1 - th
+            # 과목명
+            c.create_text(cx, y + BH // 2 - 10,
+                          text=nm, fill="white",
+                          font=("맑은 고딕", 10, "bold"),
+                          width=dw - 8)
+            # 학점
+            c.create_text(cx, y + BH // 2 + 10,
+                          text=f"{cr}학점", fill="#eee",
+                          font=("맑은 고딕", 10),
+                          width=dw - 8)
 
-        c.create_rectangle(x0, y0, x1, y1,
-                           fill="#1c1c30", outline="#3a3a55", width=1)
-        c.create_text((x0 + x1) // 2, (y0 + y1) // 2,
-                      text=text, fill="#aad4ff",
-                      font=font, anchor="center")
+            y = y1 + PAD
