@@ -82,14 +82,13 @@ class App(ctk.CTk):
     # ── 이벤트 핸들러 ──────────────────────────────────
 
     def _on_generate_click(self):
-        """생성 버튼 클릭 → 학점 초과 경고 시 탐색 중단, 정상이면 탐색 실행"""
+        """생성 버튼 클릭 → 학점 경고 안내 후 탐색 실행"""
         prefs = self.panel.get_preferences()
 
-        # 학점 초과 경고 검사 — 초과 시 탐색 중단
         warning = self._check_credit_warning(prefs)
         if warning:
             self.panel.set_info(warning)
-            return
+            # 경고가 있어도 탐색은 진행 — algorithm이 한도 내에서 자동 조정
 
         threading.Thread(target=self._run_search, daemon=True).start()
 
@@ -110,7 +109,7 @@ class App(ctk.CTk):
                 f"⚠️ 전공 {major_cr}학점 + 교양필수 {liberal_cr}학점 "
                 f"= {total_fixed}학점으로\n"
                 f"최대 수강학점({max_cr}학점)을 초과합니다.\n"
-                f"교양필수 선택을 줄이거나 전공 과목을 조정해주세요."
+                f"이수 가능한 범위 내에서 최적 시간표를 탐색합니다."
             )
 
         # 교양선택 여유 학점이 2학점 미만이면 경고
