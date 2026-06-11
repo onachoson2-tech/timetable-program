@@ -56,10 +56,12 @@ def has_internal_conflict(rows: list) -> bool:
 
 # ── 분반 선택 ──────────────────────────────────────────
 
-def pick_best_branch(df, name: str, existing: list, prefs: dict) -> tuple | None:
+def pick_best_branch(df, name: str, existing: list, prefs: dict,
+                     shuffle: bool = False) -> tuple | None:
     """
     과목의 여러 분반 중 기존 수업과 충돌 없고 조건 필터를 통과하는
     첫 번째 분반을 반환.
+    shuffle=True 이면 분반 순서를 랜덤 셔플 후 탐색 (다양한 분반 배정).
     반환: (branch_key, rows) 또는 None
     branch_key: "교수명_분반번호" 형태의 문자열
     """
@@ -67,7 +69,11 @@ def pick_best_branch(df, name: str, existing: list, prefs: dict) -> tuple | None
     if not branches:
         return None
 
-    for key, rows in branches.items():
+    items = list(branches.items())
+    if shuffle:
+        random.shuffle(items)
+
+    for key, rows in items:
         if has_any_conflict(existing + rows):
             continue
         if not passes_filters(rows, prefs):
@@ -270,10 +276,11 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
 
 def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
                  fixed_profs: dict, prefs: dict):
-    """과목을 fixed 목록에 추가. 이미 있거나 분반 없으면 무시."""
+    """과목을 fixed 목록에 추가. 이미 있거나 분반 없으면 무시.
+    분반이 여러 개인 경우 랜덤 셔플 후 충돌 없는 분반 선택."""
     if name in fixed_names:
         return
-    result = pick_best_branch(df, name, fixed_rows, prefs)
+    result = pick_best_branch(df, name, fixed_rows, prefs, shuffle=True)
     if result:
         key, branch = result
         fixed_rows.extend(branch)
