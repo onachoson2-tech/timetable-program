@@ -355,9 +355,13 @@ def generate_timetables(preferences: dict, honor_student: bool = False,
                         continue
 
                     # 사이버강좌 2과목 초과 제외
+                    # 판별 기준: 비고에 사이버강좌 관련 키워드 포함 여부
+                    # (요일 없음만으로는 판별 불가 — 진로탐색Ⅰ 등 요일 없는 비사이버 과목 존재)
+                    _CYBER_KEYWORDS = ("사이버", "동영상수업", "CU12강좌")
                     cyber_count = sum(
                         1 for _, _, rows in combo
-                        if all(str(row.get("요일", "")) in ("", "nan") for row in rows)
+                        if any(kw in str(rows[0].get("비고", ""))
+                               for kw in _CYBER_KEYWORDS)
                     )
                     if cyber_count > 2:
                         continue
