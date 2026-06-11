@@ -183,7 +183,7 @@ class SettingsPanel(ctk.CTkScrollableFrame):
             (self._avoid_morning, "🌅 오전 수업 피하기"),
             (self._no_friday,     "🎉 금공강 원함"),
             (self._keep_lunch,    "🍱 점심시간 확보 (12~13시)"),
-            (self._honor_st,      "⭐ 직전학기 4.0이상 → 최대 21학점"),
+            (self._honor_st,      "⭐ 직전학기 4.0이상 → 최대 21.5학점"),
         ]:
             ctk.CTkCheckBox(f, text=txt, variable=var,
                             font=ctk.CTkFont(size=11)
