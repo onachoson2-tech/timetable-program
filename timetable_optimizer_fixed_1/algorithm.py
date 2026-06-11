@@ -163,11 +163,12 @@ def _build_opt_candidates(df, fixed_rows: list, fixed_names: set,
 
 def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple:
     """
-    preferences 에 따라 유효한 시간표를 탐색해 반환.
+    버튼 클릭 시마다 교양필수·분반을 랜덤 배정하고
+    교양선택 조합 중 조건에 맞는 1개를 즉시 반환.
 
     반환: (results, timed_out)
-      results   : [(subject_profs, free_days, total_credits), ...]
-      timed_out : 15초 초과로 중단된 경우 True
+      results   : [(subject_profs, free_days, total_credits)] — 항상 1개
+      timed_out : 15초 초과로 결과를 찾지 못한 경우 True
       subject_profs: [(과목명, 교수명_분반번호), ...]
     """
     TIMEOUT_SEC = 15
@@ -176,36 +177,34 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
     max_cr = MAX_CREDITS_HONOR if honor_student else MAX_CREDITS
     prefs  = preferences
 
+    start_time = time.time()
+
     # 전공 과목을 단일분반/다분반으로 분리
-    single_majors = []   # 분반 1개 과목
-    multi_majors  = []   # 분반 여러 개 과목 (사제동행세미나 등)
+    single_majors = []
+    multi_majors  = []
 
     for nm in preferences.get("selected_major", []):
         branches = get_subject_branches(df, nm)
-        valid = [(k, v) for k, v in branches.items()]
+        valid = list(branches.items())
         if len(valid) <= 1:
             single_majors.append(nm)
         else:
             multi_majors.append((nm, valid))
 
-    # 다분반 과목의 모든 분반 조합 생성
+    # 다분반 과목 분반 조합 — 랜덤 셔플
     from itertools import product as iproduct
     if multi_majors:
         multi_names   = [nm for nm, _ in multi_majors]
         multi_options = [options for _, options in multi_majors]
         branch_combos = list(iproduct(*multi_options))
+        random.shuffle(branch_combos)
     else:
         multi_names   = []
-        branch_combos = [()]  # 다분반 과목 없으면 빈 조합 1개
-
-    all_results = []
-    timed_out   = False
-    start_time  = time.time()
+        branch_combos = [()]
 
     for branch_combo in branch_combos:
         if time.time() - start_time > TIMEOUT_SEC:
-            timed_out = True
-            break
+            return [], True
 
         fixed_rows: list  = []
         fixed_names: set  = set()
@@ -227,9 +226,7 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
         if skip_combo:
             continue
 
-        # 3. 선택한 교양필수 영역에서 과목 자동 배정
-        #    LIBERAL_AREA_COUNT 기준으로 영역당 지정된 수만큼 배정
-        #    max_cr 한도 초과 시 해당 과목 건너뜀
+        # 3. 교양필수 영역에서 과목 랜덤 배정
         for area in preferences.get("selected_liberal", []):
             domain = LIBERAL_AREA_DOMAINS.get(area)
             if not domain:
@@ -260,8 +257,9 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
         fixed_cr  = _sum_credits(fixed_rows, fixed_names)
         remaining = max_cr - fixed_cr
 
-        # 5. 교양선택 후보 사전 정리
+        # 5. 교양선택 후보 사전 정리 후 랜덤 셔플
         candidates = _build_opt_candidates(df, fixed_rows, fixed_names, prefs)
+        random.shuffle(candidates)
 
         # 6. 남은 학점으로 가능한 최대 r 동적 계산
         if candidates:
@@ -270,22 +268,17 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
         else:
             max_r = 0
 
-        # 7. 조합 탐색
-        PER_R   = 200
-        MAX_ALL = 1400
-
-        for r in range(0, max_r + 1):
-            count_r = 0
+        # 7. 셔플된 후보에서 조건에 맞는 첫 번째 조합 1개 반환
+        for r in range(max_r, -1, -1):   # 학점 많은 조합부터 탐색
             for combo in combinations(candidates, r):
                 if time.time() - start_time > TIMEOUT_SEC:
-                    timed_out = True
-                    break
+                    return [], True
 
                 combo_cr = sum(float(c[2][0].get("학점", 0)) for c in combo)
                 if combo_cr > remaining:
                     continue
 
-                # 사이버강좌(요일 없는 과목) 2과목 초과 조합 제외
+                # 사이버강좌 2과목 초과 제외
                 cyber_count = sum(
                     1 for _, _, rows in combo
                     if all(str(row.get("요일", "")) in ("", "nan") for row in rows)
@@ -304,21 +297,10 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
                     [(nm, fixed_profs[nm]) for nm in fixed_names]
                     + [(nm, key) for nm, key, _ in combo]
                 )
-                all_results.append((subject_profs, free, active, variance, total))
-                count_r += 1
+                # 조건에 맞는 첫 번째 조합 즉시 반환
+                return [(subject_profs, free, total)], False
 
-                if count_r >= PER_R:
-                    break
-
-            if timed_out:
-                break
-            if len(all_results) >= MAX_ALL:
-                break
-
-        if timed_out or len(all_results) >= MAX_ALL:
-            break
-
-    return _dedupe_and_shuffle(all_results), timed_out
+    return [], True
 
 
 def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
