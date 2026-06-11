@@ -285,6 +285,14 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
                 if combo_cr > remaining:
                     continue
 
+                # 사이버강좌(요일 없는 과목) 2과목 초과 조합 제외
+                cyber_count = sum(
+                    1 for _, _, rows in combo
+                    if all(str(row.get("요일", "")) in ("", "nan") for row in rows)
+                )
+                if cyber_count > 2:
+                    continue
+
                 combo_rows = [row for _, _, rows in combo for row in rows]
                 if has_internal_conflict(combo_rows):
                     continue
