@@ -277,7 +277,7 @@ def generate_timetables(preferences: dict, honor_student: bool = False,
             max_r = 0
 
         # 7. 조합 탐색 — 1초 내 찾은 결과 수집 (이미 찾은 결과 제외)
-        for r in range(max_r, -1, -1):
+        for r in range(0, max_r + 1):
             for combo in combinations(candidates, r):
                 if time.time() - start_time > TIMEOUT_SEC:
                     timed_out = True
