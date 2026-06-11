@@ -134,7 +134,7 @@ class App(ctk.CTk):
         if not warning:
             self.panel.set_info("최적 시간표를 탐색하고 있습니다...")
 
-        results = generate_timetables(prefs, honor)
+        results, timed_out = generate_timetables(prefs, honor)
 
         self._results = results
         self.panel.set_btn_state(generating=False)
@@ -146,9 +146,14 @@ class App(ctk.CTk):
             self.timetable.clear()
             return
 
-        self._refresh_view()
+        if timed_out:
+            self.panel.set_info(
+                "⚠️ 탐색 시간(15초)이 초과되어 중단되었습니다.\n"
+                "조건을 완화하면 더 많은 결과를 찾을 수 있습니다.")
 
-    def _refresh_view(self):
+        self._refresh_view(show_info=not timed_out)
+
+    def _refresh_view(self, show_info: bool = True):
         """결과 탭 변경 또는 탐색 완료 시 시간표 갱신"""
         if not self._results:
             self.timetable.clear()
@@ -162,7 +167,8 @@ class App(ctk.CTk):
         reason = get_reason(subject_profs, free, cr, prefs)
 
         names = [nm for nm, _ in subject_profs]
-        self.panel.set_info(f"{reason}\n총 {len(names)}과목 · {cr}학점")
+        if show_info:
+            self.panel.set_info(f"{reason}\n총 {len(names)}과목 · {cr}학점")
         self.timetable.show(subject_profs)
 
 
