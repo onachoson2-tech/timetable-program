@@ -75,19 +75,14 @@ class TimetableCanvas:
 
         df = load_data()
         online = self._get_online_subjects(df) if self._subject_profs else []
-        has_online = len(online) > 0
 
         n_slots = TIMETABLE_END_H - TIMETABLE_START_H
 
-        # 온라인 열이 있으면 시간표 가로 비율 축소 (6열 중 5열만 시간표)
-        if has_online:
-            dw = (W - self.TIME_W) // 6   # 요일 열 너비 (온라인 열 포함 6열)
-        else:
-            dw = (W - self.TIME_W) // 5   # 요일 열 너비 (5열)
+        # 온라인 열 항상 유지 (6열 기준)
+        dw = (W - self.TIME_W) // 6
+        sh = (H - self.HDR) / n_slots
 
-        sh = (H - self.HDR) / n_slots     # 1시간 높이
-
-        self._draw_grid(c, W, H, dw, sh, n_slots, has_online)
+        self._draw_grid(c, W, H, dw, sh, n_slots)
 
         if not self._subject_profs:
             c.create_text(W // 2, H // 2,
@@ -96,10 +91,9 @@ class TimetableCanvas:
             return
 
         self._draw_courses(c, dw, sh, df)
-        if has_online:
-            self._draw_online_col(c, dw, sh, online)
+        self._draw_online_col(c, dw, sh, online)
 
-    def _draw_grid(self, c, W, H, dw, sh, n_slots, has_online: bool):
+    def _draw_grid(self, c, W, H, dw, sh, n_slots):
         HDR, TIME_W = self.HDR, self.TIME_W
 
         c.create_rectangle(0, 0, W, H, fill="#0f0f1a", outline="")
@@ -112,16 +106,15 @@ class TimetableCanvas:
             c.create_text(x0 + dw // 2, HDR // 2, text=day,
                           fill="white", font=("맑은 고딕", 11, "bold"))
 
-        # 온라인 열 헤더
-        if has_online:
-            ox = TIME_W + 5 * dw
-            c.create_rectangle(ox, 0, ox + dw, HDR,
-                                fill="#1c2030", outline="#2a2a45")
-            c.create_text(ox + dw // 2, HDR // 2, text="📡 온라인",
-                          fill="#aad4ff", font=("맑은 고딕", 10, "bold"))
+        # 온라인 열 헤더 (항상 표시)
+        ox = TIME_W + 5 * dw
+        c.create_rectangle(ox, 0, ox + dw, HDR,
+                            fill="#1c2030", outline="#2a2a45")
+        c.create_text(ox + dw // 2, HDR // 2, text="📡 온라인",
+                      fill="#aad4ff", font=("맑은 고딕", 10, "bold"))
 
-        # 시간 눈금 + 가로선
-        grid_w = W if not has_online else TIME_W + 5 * dw
+        # 시간 눈금 + 가로선 (월~금 영역만)
+        grid_w = TIME_W + 5 * dw
         for i in range(n_slots + 1):
             y = HDR + i * sh
             c.create_line(TIME_W, y, grid_w, y, fill="#1e1e35")
@@ -132,15 +125,10 @@ class TimetableCanvas:
                               text=f"{TIMETABLE_START_H + i}시",
                               fill="#555", font=("맑은 고딕", 9))
 
-        # 세로선 (월~금)
-        for i in range(6):
+        # 세로선 (월~금 + 온라인)
+        for i in range(7):
             c.create_line(TIME_W + i * dw, HDR,
                           TIME_W + i * dw, H, fill="#1e1e35")
-
-        # 온라인 열 오른쪽 세로선
-        if has_online:
-            c.create_line(TIME_W + 6 * dw, HDR,
-                          TIME_W + 6 * dw, H, fill="#1e1e35")
 
     def _draw_courses(self, c, dw, sh, df):
         HDR, TIME_W = self.HDR, self.TIME_W
@@ -200,33 +188,33 @@ class TimetableCanvas:
                 if bh >= 80:
                     c.create_text(cx, y0 + bh // 2 - 18,
                                   text=nm, fill="white",
-                                  font=("맑은 고딕", 14, "bold"),
-                                  width=dw - 8)
+                                  font=("맑은 고딕", 11, "bold"),
+                                  width=dw - 6)
                     c.create_text(cx, y0 + bh // 2 + 2,
                                   text=prof_name, fill="#ddd",
-                                  font=("맑은 고딕", 11),
-                                  width=dw - 8)
+                                  font=("맑은 고딕", 10),
+                                  width=dw - 6)
                     if room:
-                        c.create_text(cx, y0 + bh // 2 + 20,
+                        c.create_text(cx, y0 + bh // 2 + 18,
                                       text=room, fill="#bbb",
-                                      font=("맑은 고딕", 10),
-                                      width=dw - 8)
+                                      font=("맑은 고딕", 9),
+                                      width=dw - 6)
 
                 elif bh >= 50:
                     c.create_text(cx, y0 + bh // 2 - 9,
                                   text=nm, fill="white",
-                                  font=("맑은 고딕", 13, "bold"),
-                                  width=dw - 8)
-                    c.create_text(cx, y0 + bh // 2 + 11,
+                                  font=("맑은 고딕", 11, "bold"),
+                                  width=dw - 6)
+                    c.create_text(cx, y0 + bh // 2 + 9,
                                   text=prof_name, fill="#ddd",
-                                  font=("맑은 고딕", 11),
-                                  width=dw - 8)
+                                  font=("맑은 고딕", 10),
+                                  width=dw - 6)
 
                 elif bh >= 28:
                     c.create_text(cx, y0 + bh // 2,
                                   text=nm, fill="white",
-                                  font=("맑은 고딕", 11, "bold"),
-                                  width=dw - 8)
+                                  font=("맑은 고딕", 10, "bold"),
+                                  width=dw - 6)
 
     def _draw_online_col(self, c, dw, sh, online: list):
         """온라인 강좌를 오른쪽 열에 위에서부터 순서대로 블록으로 표시"""
