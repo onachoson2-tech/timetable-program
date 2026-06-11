@@ -31,8 +31,11 @@ GitHub: https://github.com/onachoson2-tech/timetable-program
 - VERUM인간 한 학기 1과목 배정으로 수정 완료 (졸업 전 총 2과목)
 - 온라인 강좌 시간표 우측 별도 열 표시 적용 완료 (항상 유지)
 - 사제동행세미나 분반 다양화 적용 완료
-- 사이버강좌 수강 가능 처리 완료 (학기당 2과목 이하 자동 제한)
+- 사이버강좌 수강 가능 처리 완료 (학기당 2과목 이하 자동 제한, 비고 키워드 기준 판별)
 - 버튼 클릭마다 1초 탐색 후 누적 풀에서 랜덤 시간표 표시 적용 완료
+- 교양필수 탐색 재설계 완료 (영역별 모든 과목 조합 생성 후 교양선택과 함께 탐색)
+- 시간표 조건(점심확보 등) 적용 시 결과 0개 버그 수정 완료
+- CU12계절학기전용 과목 수강 불가 처리 완료
 
 ---
 
@@ -299,6 +302,11 @@ timetable_optimizer_fixed_1/
 | `main.py` — 순환 로직 제거, 매번 새로 탐색 후 랜덤 1개 표시 | ✅ 완료 |
 | `algorithm.py` — seen_keys 파라미터 추가, 1초 탐색 후 새 결과만 반환 | ✅ 완료 |
 | `main.py` — 누적 결과 풀(_result_pool) 관리, 조건 변경 시 초기화, 결과 수·타임아웃 표시 제거 | ✅ 완료 |
+| `algorithm.py` — 교양필수 탐색 재설계: 영역별 모든 과목 조합을 생성 후 교양선택과 함께 탐색 (_build_liberal_combos 신규) | ✅ 완료 |
+| `algorithm.py` — _dedupe_and_shuffle() 제거 (seen_keys로 대체), iproduct import 상단 통합 | ✅ 완료 |
+| `algorithm.py` — _build_liberal_combos에서 과목당 모든 통과 분반을 후보에 포함 (keep_lunch 등 조건에서 결과 0개 버그 수정) | ✅ 완료 |
+| `algorithm.py` — 사이버강좌 판별 기준을 비고 키워드(사이버·동영상수업·CU12강좌)로 변경 (요일 없음 기준 제거) | ✅ 완료 |
+| `filters.py`, `data_loader.py` — _INVALID_REMARKS에 CU12계절학기전용 키워드 추가 | ✅ 완료 |
 
 ---
 
