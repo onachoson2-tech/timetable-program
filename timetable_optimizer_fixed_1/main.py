@@ -3,6 +3,7 @@
 # ────────────────────────────────
 
 import threading
+import random
 import customtkinter as ctk
 
 from ui_panel    import SettingsPanel
@@ -52,9 +53,10 @@ class App(ctk.CTk):
         self.geometry("1060x880")
         self.resizable(True, True)
 
-        self._results: list = []
-        self._result_idx: int = 0
-        self._timed_out: bool = False
+        self._result_pool: list = []   # 누적 결과 풀
+        self._seen_keys:   set  = set()  # 중복 방지용 키 집합
+        self._exhausted:   bool = False  # 모든 경우의 수 탐색 완료 여부
+        self._last_prefs:  dict = {}     # 마지막 조건 (조건 변경 감지용)
 
         self._build_layout()
         self._connect_events()
@@ -83,13 +85,26 @@ class App(ctk.CTk):
     # ── 이벤트 핸들러 ──────────────────────────────────
 
     def _on_generate_click(self):
-        """생성 버튼 클릭 → 매번 새로 탐색하여 랜덤 시간표 반환"""
+        """생성 버튼 클릭 → 같은 조건이면 누적 탐색, 조건 변경 시 초기화"""
         prefs = self.panel.get_preferences()
 
         warning = self._check_credit_warning(prefs)
         if warning:
             self.panel.set_info(warning)
 
+        # 조건이 바뀌면 풀 초기화
+        if prefs != self._last_prefs:
+            self._result_pool = []
+            self._seen_keys   = set()
+            self._exhausted   = False
+            self._last_prefs  = prefs
+
+        # 모든 경우의 수를 다 찾은 경우 → 탐색 없이 바로 표시
+        if self._exhausted and self._result_pool:
+            self._show_random()
+            return
+
+        # 추가 탐색 실행
         threading.Thread(target=self._run_search, args=(prefs,), daemon=True).start()
 
     def _check_credit_warning(self, prefs: dict) -> str:
@@ -129,43 +144,34 @@ class App(ctk.CTk):
         self.panel.set_info("최적 시간표를 탐색하고 있습니다...")
 
         honor = prefs.get("honor_student", False)
-        results, timed_out = generate_timetables(prefs, honor)
+        new_results, exhausted = generate_timetables(
+            prefs, honor, seen_keys=self._seen_keys)
 
-        self._results    = results
-        self._timed_out  = timed_out
-        self._result_idx = 0
+        self._result_pool.extend(new_results)
+        self._exhausted = exhausted
         self.panel.set_btn_state(generating=False)
 
-        if not results:
+        if not self._result_pool:
             self.panel.set_info(
                 "❌ 조건에 맞는 시간표가 없습니다.\n"
                 "선택 과목을 줄이거나 조건을 완화해보세요.")
             self.timetable.clear()
             return
 
-        self._refresh_view()
+        self._show_random()
 
-    def _refresh_view(self):
-        """결과 표시 — 현재 인덱스의 시간표를 표시"""
-        if not self._results:
+    def _show_random(self):
+        """누적 풀에서 랜덤 1개를 선택해 표시"""
+        if not self._result_pool:
             self.timetable.clear()
             return
 
-        idx = self._result_idx % len(self._results)
-        subject_profs, free, cr = self._results[idx]
+        subject_profs, free, cr = random.choice(self._result_pool)
         prefs  = self.panel.get_preferences()
         reason = get_reason(subject_profs, free, cr, prefs)
 
         names = [nm for nm, _ in subject_profs]
-        total = len(self._results)
-        info  = f"{reason}\n총 {len(names)}과목 · {cr}학점 ({idx + 1}/{total})"
-
-        if self._timed_out:
-            info = (
-                "⚠️ 탐색 시간(15초)이 초과되어 중단되었습니다.\n"
-                "조건을 완화하면 더 많은 결과를 찾을 수 있습니다.\n"
-                f"{info}"
-            )
+        info  = f"{reason}\n총 {len(names)}과목 · {cr}학점"
 
         self.panel.set_info(info)
         self.timetable.show(subject_profs)
