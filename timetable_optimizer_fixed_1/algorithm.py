@@ -180,12 +180,16 @@ def _build_liberal_combos(df, selected_liberal: list, fixed_rows: list,
         count     = LIBERAL_AREA_COUNT.get(area, 1)
         domain_df = get_courses_by_domain(df, domain)
 
-        # 해당 영역에서 수강 가능한 과목 목록 (전공과 충돌 없는 것)
+        # 해당 영역에서 수강 가능한 분반 목록 (분반 단위로 모두 수집)
+        # 과목당 첫 번째 분반만 넣으면 다른 분반과 충돌 회피 불가
+        # → 통과하는 모든 분반을 후보에 포함해야 충돌 없는 조합 탐색 가능
+        seen_nms: set = set()
         area_candidates = []
         for _, row in domain_df.iterrows():
             nm = row["과목명"]
-            if nm in fixed_names:
+            if nm in fixed_names or nm in seen_nms:
                 continue
+            seen_nms.add(nm)
             branches = get_subject_branches(df, nm)
             for key, branch_rows in branches.items():
                 if not passes_filters(branch_rows, prefs):
@@ -193,7 +197,6 @@ def _build_liberal_combos(df, selected_liberal: list, fixed_rows: list,
                 if conflicts_with_fixed(branch_rows, fixed_rows):
                     continue
                 area_candidates.append((nm, key, branch_rows))
-                break
 
         if not area_candidates:
             return []  # 해당 영역에서 배정 불가 → 전체 조합 없음
