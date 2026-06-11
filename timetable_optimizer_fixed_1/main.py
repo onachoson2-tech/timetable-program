@@ -83,22 +83,13 @@ class App(ctk.CTk):
     # ── 이벤트 핸들러 ──────────────────────────────────
 
     def _on_generate_click(self):
-        """생성 버튼 클릭 → 조건 변경 시 새로 탐색, 같은 조건이면 다음 결과 즉시 표시"""
+        """생성 버튼 클릭 → 매번 새로 탐색하여 랜덤 시간표 반환"""
         prefs = self.panel.get_preferences()
 
         warning = self._check_credit_warning(prefs)
         if warning:
             self.panel.set_info(warning)
 
-        # 조건이 이전과 같고 결과가 있으면 탐색 없이 다음 결과로 순환
-        if (hasattr(self, '_last_prefs')
-                and self._last_prefs == prefs
-                and self._results):
-            self._result_idx = (self._result_idx + 1) % len(self._results)
-            self._refresh_view()
-            return
-
-        # 조건이 바뀌었거나 첫 탐색 → 새로 탐색
         threading.Thread(target=self._run_search, args=(prefs,), daemon=True).start()
 
     def _check_credit_warning(self, prefs: dict) -> str:
@@ -142,7 +133,6 @@ class App(ctk.CTk):
 
         self._results    = results
         self._timed_out  = timed_out
-        self._last_prefs = prefs
         self._result_idx = 0
         self.panel.set_btn_state(generating=False)
 
