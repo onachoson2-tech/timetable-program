@@ -3,6 +3,7 @@
 # ────────────────────────────────
 
 import time
+import random
 from itertools import combinations
 from data_loader import (load_data, time_to_min,
                          get_subject_branches, get_courses_by_category,
@@ -264,7 +265,7 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
         if len(results) >= MAX_ALL:
             break
 
-    return _pick_three(results), timed_out
+    return _dedupe_and_shuffle(results), timed_out
 
 
 def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
@@ -280,34 +281,23 @@ def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
         fixed_profs[name] = key
 
 
-# ── 결과 정렬 및 3개 선택 ─────────────────────────────
-
-def _pick_three(results: list) -> list:
+def _dedupe_and_shuffle(results: list) -> list:
     """
-    탐색된 결과에서 균형형·공강형·몰아듣기형 각 1개를 선택해 반환.
-
-    균형형      : 요일별 수업 수 편차(day_variance) 최소
-    공강형      : 공강 일수(free_days) 최대
-    몰아듣기형  : 수업 있는 요일 수(active_days) 최소
+    탐색된 결과에서 과목 조합이 동일한 중복을 제거하고
+    랜덤 순서로 섞어 반환.
     """
     if not results:
         return []
 
-    balanced = sorted(results, key=lambda x: x[3])[0]
-    free_day = sorted(results, key=lambda x: -x[1])[0]
-    packed   = sorted(results, key=lambda x: x[2])[0]
-
-    def trim(r):
-        return (r[0], r[1], r[4])
-
-    seen, trimmed = set(), []
-    for r in [balanced, free_day, packed]:
+    seen, unique = set(), []
+    for r in results:
         key = tuple(sorted(nm for nm, _ in r[0]))
         if key not in seen:
             seen.add(key)
-            trimmed.append(trim(r))
+            unique.append((r[0], r[1], r[4]))  # (subject_profs, free_days, total_credits)
 
-    return trimmed
+    random.shuffle(unique)
+    return unique
 
 
 # ── 추천 이유 텍스트 ──────────────────────────────────
