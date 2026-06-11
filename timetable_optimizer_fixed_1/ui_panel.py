@@ -32,11 +32,10 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         }
 
     def get_result_index(self) -> int:
-        return {"🥇 균형형": 0, "🥈 공강형": 1, "🥉 몰아듣기형": 2}.get(
-            self._result_var.get(), 0)
+        return 0
 
     def set_result_change_cb(self, cb):
-        self._result_var.trace_add("write", lambda *_: cb())
+        pass  # 추천 결과 탭 제거로 불필요
 
     def set_info(self, text: str):
         self._info_lbl.configure(text=text)
@@ -74,7 +73,6 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         self._build_major()
         self._build_liberal()
         self._build_conditions()
-        self._build_result_selector()
         self._build_info_and_btn()
 
         # 초기 트랙 상태 적용
@@ -189,14 +187,6 @@ class SettingsPanel(ctk.CTkScrollableFrame):
                             font=ctk.CTkFont(size=11)
                             ).pack(pady=3, padx=14, anchor="w")
         ctk.CTkFrame(f, height=6, fg_color="transparent").pack()
-
-    def _build_result_selector(self):
-        f = self._section("📅 추천 결과")
-        self._result_var = ctk.StringVar(value="🥇 균형형")
-        ctk.CTkSegmentedButton(f,
-            values=["🥇 균형형", "🥈 공강형", "🥉 몰아듣기형"],
-            variable=self._result_var, font=ctk.CTkFont(size=11)
-        ).pack(pady=(0, 10), padx=12, fill="x")
 
     def _build_info_and_btn(self):
         self._info_lbl = ctk.CTkLabel(self, text="",
