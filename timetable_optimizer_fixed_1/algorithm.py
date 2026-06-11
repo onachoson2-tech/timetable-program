@@ -161,17 +161,21 @@ def _build_opt_candidates(df, fixed_rows: list, fixed_names: set,
 
 # ── 메인 탐색 함수 ─────────────────────────────────────
 
-def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple:
+def generate_timetables(preferences: dict, honor_student: bool = False,
+                        seen_keys: set = None) -> tuple:
     """
-    버튼 클릭 시마다 교양필수·분반을 랜덤 배정하고
-    교양선택 조합 중 조건에 맞는 1개를 즉시 반환.
+    최대 1초 탐색 후 찾은 결과를 반환.
+    seen_keys: 이미 찾은 결과의 키 집합 (누적 탐색 시 중복 제거용)
 
-    반환: (results, timed_out)
-      results   : [(subject_profs, free_days, total_credits)] — 항상 1개
-      timed_out : 15초 초과로 결과를 찾지 못한 경우 True
+    반환: (results, exhausted)
+      results   : [(subject_profs, free_days, total_credits), ...]
+      exhausted : 모든 경우의 수를 다 찾은 경우 True
       subject_profs: [(과목명, 교수명_분반번호), ...]
     """
-    TIMEOUT_SEC = 15
+    TIMEOUT_SEC = 1
+
+    if seen_keys is None:
+        seen_keys = set()
 
     df     = load_data()
     max_cr = MAX_CREDITS_HONOR if honor_student else MAX_CREDITS
@@ -202,9 +206,13 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
         multi_names   = []
         branch_combos = [()]
 
+    new_results = []
+    timed_out   = False
+
     for branch_combo in branch_combos:
         if time.time() - start_time > TIMEOUT_SEC:
-            return [], True
+            timed_out = True
+            break
 
         fixed_rows: list  = []
         fixed_names: set  = set()
@@ -268,11 +276,12 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
         else:
             max_r = 0
 
-        # 7. 셔플된 후보에서 조건에 맞는 첫 번째 조합 1개 반환
-        for r in range(max_r, -1, -1):   # 학점 많은 조합부터 탐색
+        # 7. 조합 탐색 — 1초 내 찾은 결과 수집 (이미 찾은 결과 제외)
+        for r in range(max_r, -1, -1):
             for combo in combinations(candidates, r):
                 if time.time() - start_time > TIMEOUT_SEC:
-                    return [], True
+                    timed_out = True
+                    break
 
                 combo_cr = sum(float(c[2][0].get("학점", 0)) for c in combo)
                 if combo_cr > remaining:
@@ -290,17 +299,29 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
                 if has_internal_conflict(combo_rows):
                     continue
 
-                all_rows = fixed_rows + combo_rows
-                free, active, variance, total = calc_timetable_stats(all_rows)
-
                 subject_profs = (
                     [(nm, fixed_profs[nm]) for nm in fixed_names]
                     + [(nm, key) for nm, key, _ in combo]
                 )
-                # 조건에 맞는 첫 번째 조합 즉시 반환
-                return [(subject_profs, free, total)], False
+                # 중복 키 확인 후 새 결과만 추가
+                result_key = tuple(sorted((nm, prof) for nm, prof in subject_profs))
+                if result_key not in seen_keys:
+                    seen_keys.add(result_key)
+                    all_rows = fixed_rows + combo_rows
+                    free, _, _, total = calc_timetable_stats(all_rows)
+                    new_results.append((subject_profs, free, total))
 
-    return [], True
+            if timed_out:
+                break
+
+        if timed_out:
+            break
+
+    # 새 결과가 없으면 더 이상 찾을 것이 없다고 판단
+    exhausted = len(new_results) == 0
+
+    random.shuffle(new_results)
+    return new_results, exhausted
 
 
 def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
