@@ -180,6 +180,7 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
 
     # 2. 선택한 교양필수 영역에서 과목 자동 배정
     #    LIBERAL_AREA_COUNT 기준으로 영역당 지정된 수만큼 배정
+    #    max_cr 한도 초과 시 해당 과목 건너뜀
     for area in preferences.get("selected_liberal", []):
         domain = LIBERAL_AREA_DOMAINS.get(area)
         if not domain:
@@ -193,6 +194,11 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple
                 break
             nm = row["과목명"]
             if nm in fixed_names:
+                continue
+            # 학점 한도 초과 검사
+            current_cr = _sum_credits(fixed_rows, fixed_names)
+            subject_cr = float(row.get("학점", 0))
+            if current_cr + subject_cr > max_cr:
                 continue
             result = pick_best_branch(df, nm, fixed_rows, prefs)
             if result:
