@@ -190,13 +190,13 @@ GitHub: https://github.com/onachoson2-tech/timetable-program
 
 ```
 timetable_optimizer_fixed_1/
-├── main.py          # 앱 진입점, 이벤트 연결, 학점 경고 검사
-├── ui_panel.py      # 왼쪽 설정 패널 UI (트랙별 자동 체크 포함)
-├── canvas_view.py   # 시간표 캔버스 그리기 (과목명·교수명·강의실 표시)
-├── algorithm.py     # 충돌 검사 및 시간표 탐색
-├── filters.py       # 시간표 조건 필터링 (학년·비고·오전회피·금공강·점심확보)
-├── data_loader.py   # 데이터 로딩 및 시간 처리 (26학번 수강 자격 사전 필터링)
-├── config.py        # 상수 및 규칙 정의
+├── main.py          # 앱 진입점, 이벤트 연결, 학점 경고 검사, 누적 탐색 풀 관리
+├── ui_panel.py      # 왼쪽 설정 패널 UI (트랙별 자동 체크, 교양필수 체크박스, 시간표 조건)
+├── canvas_view.py   # 시간표 캔버스 그리기 (과목명·교수명·강의실 표시, 온라인 강좌 우측 열 표시)
+├── algorithm.py     # 충돌 검사 및 시간표 탐색 (교양필수 조합 생성, 교양선택 조합 탐색, 사이버강좌 제한)
+├── filters.py       # 수강 자격·시간표 조건 필터링 (학년·비고·오전회피·금공강·점심확보)
+├── data_loader.py   # 데이터 로딩 및 시간 처리 (26학번 수강 자격 사전 필터링, 분반 그룹화)
+├── config.py        # 상수 및 규칙 정의 (학점 한도, 전공 과목 목록, 교양필수 영역 설정)
 └── data.csv         # 강의 데이터
 ```
 
