@@ -53,6 +53,7 @@ class App(ctk.CTk):
         self.resizable(True, True)
 
         self._results: list = []
+        self._result_idx: int = 0
         self._timed_out: bool = False
 
         self._build_layout()
@@ -77,7 +78,7 @@ class App(ctk.CTk):
         self.timetable = TimetableCanvas(canvas_frame)
 
     def _connect_events(self):
-        self.panel.set_result_change_cb(self._refresh_view)
+        pass  # 추천 결과 탭 제거로 이벤트 연결 불필요
 
     # ── 이벤트 핸들러 ──────────────────────────────────
 
@@ -144,23 +145,29 @@ class App(ctk.CTk):
             self.timetable.clear()
             return
 
+        # 첫 탐색 시 인덱스 초기화, 재탐색 시 다음 결과로 순환
+        if not hasattr(self, '_last_prefs') or self._last_prefs != prefs:
+            self._result_idx = 0
+            self._last_prefs = prefs
+        else:
+            self._result_idx = (self._result_idx + 1) % len(self._results)
+
         self._refresh_view()
 
-    def _refresh_view(self, timed_out: bool = False):
-        """결과 탭 변경 또는 탐색 완료 시 시간표 갱신"""
+    def _refresh_view(self):
+        """결과 표시 — 현재 인덱스의 시간표를 표시"""
         if not self._results:
             self.timetable.clear()
             return
 
-        idx = self.panel.get_result_index()
-        idx = min(idx, len(self._results) - 1)
-
+        idx = self._result_idx % len(self._results)
         subject_profs, free, cr = self._results[idx]
         prefs  = self.panel.get_preferences()
         reason = get_reason(subject_profs, free, cr, prefs)
 
         names = [nm for nm, _ in subject_profs]
-        info  = f"{reason}\n총 {len(names)}과목 · {cr}학점"
+        total = len(self._results)
+        info  = f"{reason}\n총 {len(names)}과목 · {cr}학점 ({idx + 1}/{total})"
 
         if self._timed_out:
             info = (
