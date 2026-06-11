@@ -2,6 +2,7 @@
 # algorithm.py  —  충돌 검사 및 시간표 탐색
 # ────────────────────────────────
 
+import time
 from itertools import combinations
 from data_loader import (load_data, time_to_min,
                          get_subject_branches, get_courses_by_category,
@@ -153,14 +154,18 @@ def _build_opt_candidates(df, fixed_rows: list, fixed_names: set,
 
 # ── 메인 탐색 함수 ─────────────────────────────────────
 
-def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
+def generate_timetables(preferences: dict, honor_student: bool = False) -> tuple:
     """
     preferences 에 따라 유효한 시간표를 탐색해 균형형·공강형·몰아듣기형
     각 1개씩 최대 3개를 반환.
 
-    반환: [(subject_profs, free_days, total_credits), ...]
+    반환: (results, timed_out)
+      results   : [(subject_profs, free_days, total_credits), ...]
+      timed_out : 15초 초과로 중단된 경우 True
       subject_profs: [(과목명, 교수명_분반번호), ...]
     """
+    TIMEOUT_SEC = 15
+
     df     = load_data()
     max_cr = MAX_CREDITS_HONOR if honor_student else MAX_CREDITS
     prefs  = preferences
@@ -169,9 +174,9 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
     fixed_names: set  = set()
     fixed_profs: dict = {}
 
-    # 1. 선택한 전공 과목 추가
+    # 1. 선택한 전공 과목 추가 — 조건 필터 제외 ({} 전달)
     for nm in preferences.get("selected_major", []):
-        _add_subject(df, nm, fixed_rows, fixed_names, fixed_profs, prefs)
+        _add_subject(df, nm, fixed_rows, fixed_names, fixed_profs, {})
 
     # 2. 선택한 교양필수 영역에서 과목 자동 배정
     #    LIBERAL_AREA_COUNT 기준으로 영역당 지정된 수만큼 배정
@@ -211,14 +216,22 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
     else:
         max_r = 0
 
-    # 6. 조합 탐색
+    # 6. 조합 탐색 (15초 타임아웃)
     PER_R   = 200
     MAX_ALL = 1400
 
-    results = []
+    results    = []
+    timed_out  = False
+    start_time = time.time()
+
     for r in range(0, max_r + 1):
         count_r = 0
         for combo in combinations(candidates, r):
+            # 타임아웃 검사
+            if time.time() - start_time > TIMEOUT_SEC:
+                timed_out = True
+                break
+
             combo_cr = sum(float(c[2][0].get("학점", 0)) for c in combo)
             if combo_cr > remaining:
                 continue
@@ -240,10 +253,12 @@ def generate_timetables(preferences: dict, honor_student: bool = False) -> list:
             if count_r >= PER_R:
                 break
 
+        if timed_out:
+            break
         if len(results) >= MAX_ALL:
             break
 
-    return _pick_three(results)
+    return _pick_three(results), timed_out
 
 
 def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
