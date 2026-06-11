@@ -15,7 +15,6 @@ from data_loader import time_to_min
 _INVALID_REMARKS = [
     "23-25학번전용",
     "14-22학번전용",
-    "트리니티전용",
     "의과대학전용",
     "의과대헬스케어융합대26학번전용",
     "사범대학전용",
