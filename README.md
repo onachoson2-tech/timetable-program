@@ -261,10 +261,14 @@ timetable_optimizer_fixed_1/
 | `data_loader.py`, `filters.py` — VERUM인성:그리스도교문화 _REMARK_EXCEPTIONS 제거 | ✅ 완료 |
 | `data.csv` — 창의성 영역 중복 12행 제거 (24행 → 12행) | ✅ 완료 |
 | `data_loader.py`, `filters.py` — _INVALID_REMARKS에 외국인유학생전용강좌 키워드 추가 | ✅ 완료 |
+| `algorithm.py` — 전공 과목 조건 필터 제외 (오전회피·금공강·점심확보가 전공 과목에 영향 안 줌) | ✅ 완료 |
+| `algorithm.py` — 탐색 15초 타임아웃 적용 (초과 시 중단 후 결과 반환) | ✅ 완료 |
+| `main.py` — 타임아웃 경고 메시지 표시 추가 | ✅ 완료 |
+| `filters.py`, `data_loader.py` — _INVALID_REMARKS에 의과대헬스케어융합대26학번전용 키워드 추가 | ✅ 완료 |
 
 ---
 
 ## 다음 세션 작업 예정
 
-1. 실행 테스트 — 전체 기능 동작 확인 및 버그 수정
+1. 실행 테스트 — 추가 버그 확인 및 수정
 2. `data.csv` — 기타 학과 전공 과목 입력
