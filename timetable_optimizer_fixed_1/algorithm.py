@@ -4,7 +4,7 @@
 
 import time
 import random
-from itertools import combinations
+from itertools import combinations, product as iproduct
 from data_loader import (load_data, time_to_min,
                          get_subject_branches, get_courses_by_category,
                          get_courses_by_domain)
@@ -171,8 +171,6 @@ def _build_liberal_combos(df, selected_liberal: list, fixed_rows: list,
     반환: [ [(과목명, key, rows), ...], ... ]
       각 원소는 하나의 교양필수 조합 (여러 과목 포함 가능)
     """
-    from itertools import product as iproduct
-
     area_options = []  # 영역별 후보 조합 목록
 
     for area in selected_liberal:
@@ -255,7 +253,6 @@ def generate_timetables(preferences: dict, honor_student: bool = False,
             multi_majors.append((nm, valid))
 
     # 다분반 조합 생성 후 랜덤 셔플
-    from itertools import product as iproduct
     if multi_majors:
         multi_names   = [nm for nm, _ in multi_majors]
         multi_options = [options for _, options in multi_majors]
@@ -406,26 +403,6 @@ def _add_subject(df, name: str, fixed_rows: list, fixed_names: set,
         fixed_rows.extend(branch)
         fixed_names.add(name)
         fixed_profs[name] = key
-
-
-def _dedupe_and_shuffle(results: list) -> list:
-    """
-    탐색된 결과에서 과목 조합이 동일한 중복을 제거하고
-    랜덤 순서로 섞어 반환.
-    중복 기준: 과목명 + 교수명_분반번호 조합 (분반이 다르면 다른 결과로 처리)
-    """
-    if not results:
-        return []
-
-    seen, unique = set(), []
-    for r in results:
-        key = tuple(sorted((nm, prof) for nm, prof in r[0]))
-        if key not in seen:
-            seen.add(key)
-            unique.append((r[0], r[1], r[4]))  # (subject_profs, free_days, total_credits)
-
-    random.shuffle(unique)
-    return unique
 
 
 # ── 추천 이유 텍스트 ──────────────────────────────────
